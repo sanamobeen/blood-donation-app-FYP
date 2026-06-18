@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "156809188521",
+    "project_id": "blood-donation-chat",
+    "storage_bucket": "blood-donation-chat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:156809188521:android:21bb03ff6b6a4ee11c85b8",
+        "android_client_info": {
+          "package_name": "com.blooddonation.chat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBT60r_MItYoUPlSn61odWkni7V-jEqJws"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
