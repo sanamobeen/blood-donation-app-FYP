@@ -1,0 +1,607 @@
+00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2003-06-19, created_at: 2026-06-15T07:26:41.958047Z, updated_at: 2026-06-15T07:26:41.958047Z}, user: {id: 52b86d84-3d44-4121-9000-97b09c3d886f, email: iqraa@gmail.com, full_name: Iqraa, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:26:14.681434Z, last_login: null, role: donor}}}
+I/flutter (14430): 📊 Profile data keys: [success, message, profile, user]
+I/flutter (14430): 📊 Using full profile data
+I/flutter (14430): 📊 Blood requests response status: 200
+I/flutter (14430): 📋 Blood requests data: 20 requests
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: b9965223-a4b7-40ce-8fb1-87f00725bcaa, user_full_name: Iqraa, email: iqraa@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: A+, age: 22, gender: female, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2003-06-19, created_at: 2026-06-15T07:26:41.958047Z, updated_at: 2026-06-15T07:26:41.958047Z}, user: {id: 52b86d84-3d44-4121-9000-97b09c3d886f, email: iqraa@gmail.com, full_name: Iqraa, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:26:14.681434Z, last_login: null, role: donor}}}
+I/flutter (14430): 📊 Profile data keys: [success, message, profile, user]
+I/flutter (14430): 📊 Using full profile data
+I/flutter (14430): 🏠 Building body for role: donor
+I/flutter (14430):    isDonor: true
+I/flutter (14430):    isPatient: false
+I/flutter (14430): 💬 Messages: Initializing chat...
+I/flutter (14430): 🏠 Building body for role: donor
+I/flutter (14430):    isDonor: true
+I/flutter (14430):    isPatient: false
+I/flutter (14430): 💬 Messages: Firebase initialized
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 💬 Messages: Current user ID: 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 💬 Messages: Starting to listen for conversations...
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 💬 getUserConversationsStream: User ID = 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 💬 Starting to yield from controller stream
+W/DynamiteModule(14430): Local module descriptor class for com.google.android.gms.providerinstaller.dynamite not found.
+I/DynamiteModule(14430): Considering local module com.google.android.gms.providerinstaller.dynamite:0 and remote module com.google.android.gms.providerinstaller.dynamite:0
+W/ProviderInstaller(14430): Failed to load providerinstaller module: No acceptable module com.google.android.gms.providerinstaller.dynamite found. Local version is 0 and remote version is 0.
+D/ApplicationLoaders(14430): Returning zygote-cached class loader: /system/framework/org.apache.http.legacy.jar
+D/ApplicationLoaders(14430): Returning zygote-cached class loader: /system/framework/com.android.location.provider.jar
+D/ApplicationLoaders(14430): Returning zygote-cached class loader: /system/framework/com.android.media.remotedisplay.jar
+D/ApplicationLoaders(14430): Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+D/ApplicationLoaders(14430): Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+W/oddonation.chat(14430): Loading /data/app/~~siPLhhWWfJmf1bvQ20fyUA==/com.google.android.gms-0GJkmLgZt2-PCriFDaHwvw==/oat/x86_64/base.odex non-executable as it requires an image which we failed to load
+I/oddonation.chat(14430): Background young concurrent mark compact GC freed 2527KB AllocSpace bytes, 14(896KB) LOS objects, 42% free, 4324KB/7482KB, paused 2.334ms,21.450ms total 108.051ms
+D/nativeloader(14430): Configuring clns-10 for other apk /data/app/~~siPLhhWWfJmf1bvQ20fyUA==/com.google.android.gms-0GJkmLgZt2-PCriFDaHwvw==/base.apk. target_sdk_version=37, uses_libraries=, library_path=/data/app/~~siPLhhWWfJmf1bvQ20fyUA==/com.google.android.gms-0GJkmLgZt2-PCriFDaHwvw==/lib/x86_64:/data/app/~~siPLhhWWfJmf1bvQ20fyUA==/com.google.android.gms-0GJkmLgZt2-PCriFDaHwvw==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.google.android.gms
+I/oddonation.chat(14430): hiddenapi: Accessing hidden method Ldalvik/system/VMStack;->getStackClass2()Ljava/lang/Class; (runtime_flags=0, domain=core-platform, api=unsupported) from Lhgvs; (domain=app, TargetSdkVersion=36) using reflection: allowed
+E/GoogleApiManager(14430): Failed to get service from broker. 
+E/GoogleApiManager(14430): java.lang.SecurityException: Unknown calling package name 'com.google.android.gms'.
+E/GoogleApiManager(14430):      at android.os.Parcel.createExceptionOrNull(Parcel.java:3392)
+E/GoogleApiManager(14430):      at android.os.Parcel.createException(Parcel.java:3376)
+E/GoogleApiManager(14430):      at android.os.Parcel.readException(Parcel.java:3359)
+E/GoogleApiManager(14430):      at android.os.Parcel.readException(Parcel.java:3301)
+E/GoogleApiManager(14430):      at bjwi.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):36)
+E/GoogleApiManager(14430):      at bjue.z(:com.google.android.gms@262031038@26.20.31 (260800-919905943):143)
+E/GoogleApiManager(14430):      at bjaj.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):42)
+E/GoogleApiManager(14430):      at android.os.Handler.handleCallback(Handler.java:1095)
+E/GoogleApiManager(14430):      at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+E/GoogleApiManager(14430):      at android.os.Handler.dispatchMessage(Handler.java:125)
+E/GoogleApiManager(14430):      at dbov.mL(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+E/GoogleApiManager(14430):      at dbov.dispatchMessage(:com.google.android.gms@262031038@26.20.31 (260800-919905943):5)
+E/GoogleApiManager(14430):      at android.os.Looper.loopOnce(Looper.java:296)
+E/GoogleApiManager(14430):      at android.os.Looper.loop(Looper.java:397)
+E/GoogleApiManager(14430):      at android.os.HandlerThread.run(HandlerThread.java:139)
+W/GoogleApiManager(14430): Not showing notification since connectionResult is not user-facing: ConnectionResult{statusCode=DEVELOPER_ERROR, resolution=null, message=null, clientMethodKey=null}
+I/gmlp    (14430): Unable to retrieve flag snapshot for com.google.android.gms.providerinstaller#com.blooddonation.chat, using defaults.
+W/FlagRegistrar(14430): Failed to register com.google.android.gms.providerinstaller#com.blooddonation.chat
+W/FlagRegistrar(14430): gmma: 17: 17: API: Phenotype.API is not available on this device. Connection failed with: ConnectionResult{statusCode=DEVELOPER_ERROR, resolution=null, message=null, clientMethodKey=null}
+W/FlagRegistrar(14430):         at gmmc.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):13)
+W/FlagRegistrar(14430):         at hmky.d(:com.google.android.gms@262031038@26.20.31 (260800-919905943):3)
+W/FlagRegistrar(14430):         at hmla.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):139)
+W/FlagRegistrar(14430):         at hmni.execute(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagRegistrar(14430):         at hmli.f(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagRegistrar(14430):         at hmli.m(:com.google.android.gms@262031038@26.20.31 (260800-919905943):101)
+W/FlagRegistrar(14430):         at hmli.q(:com.google.android.gms@262031038@26.20.31 (260800-919905943):16)
+W/FlagRegistrar(14430):         at gfwz.hC(:com.google.android.gms@262031038@26.20.31 (260800-919905943):35)
+W/FlagRegistrar(14430):         at fser.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):12)
+W/FlagRegistrar(14430):         at hmni.execute(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagRegistrar(14430):         at fses.b(:com.google.android.gms@262031038@26.20.31 (260800-919905943):18)
+W/FlagRegistrar(14430):         at fsfh.b(:com.google.android.gms@262031038@26.20.31 (260800-919905943):34)
+W/FlagRegistrar(14430):         at fsfj.d(:com.google.android.gms@262031038@26.20.31 (260800-919905943):22)
+W/FlagRegistrar(14430):         at bixp.e(:com.google.android.gms@262031038@26.20.31 (260800-919905943):9)
+W/FlagRegistrar(14430):         at bjah.q(:com.google.android.gms@262031038@26.20.31 (260800-919905943):48)
+W/FlagRegistrar(14430):         at bjah.d(:com.google.android.gms@262031038@26.20.31 (260800-919905943):10)
+W/FlagRegistrar(14430):         at bjah.g(:com.google.android.gms@262031038@26.20.31 (260800-919905943):191)
+W/FlagRegistrar(14430):         at bjah.onConnectionFailed(:com.google.android.gms@262031038@26.20.31 (260800-919905943):2)
+W/FlagRegistrar(14430):         at bjaj.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):70)
+W/FlagRegistrar(14430):         at android.os.Handler.handleCallback(Handler.java:1095)
+W/FlagRegistrar(14430):         at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+W/FlagRegistrar(14430):         at android.os.Handler.dispatchMessage(Handler.java:125)
+W/FlagRegistrar(14430):         at dbov.mL(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagRegistrar(14430):         at dbov.dispatchMessage(:com.google.android.gms@262031038@26.20.31 (260800-919905943):5)
+W/FlagRegistrar(14430):         at android.os.Looper.loopOnce(Looper.java:296)
+W/FlagRegistrar(14430):         at android.os.Looper.loop(Looper.java:397)
+W/FlagRegistrar(14430):         at android.os.HandlerThread.run(HandlerThread.java:139)
+W/FlagRegistrar(14430): Caused by: bivu: 17: API: Phenotype.API is not available on this device. Connection failed with: ConnectionResult{statusCode=DEVELOPER_ERROR, resolution=null, message=null, clientMethodKey=null}
+W/FlagRegistrar(14430):         at bjtq.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):15)
+W/FlagRegistrar(14430):         at bixs.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagRegistrar(14430):         at bixp.e(:com.google.android.gms@262031038@26.20.31 (260800-919905943):5)
+W/FlagRegistrar(14430):         ... 13 more
+E/GoogleApiManager(14430): Failed to get service from broker. 
+E/GoogleApiManager(14430): java.lang.SecurityException: Unknown calling package name 'com.google.android.gms'.
+E/GoogleApiManager(14430):      at android.os.Parcel.createExceptionOrNull(Parcel.java:3392)
+E/GoogleApiManager(14430):      at android.os.Parcel.createException(Parcel.java:3376)
+E/GoogleApiManager(14430):      at android.os.Parcel.readException(Parcel.java:3359)
+E/GoogleApiManager(14430):      at android.os.Parcel.readException(Parcel.java:3301)
+E/GoogleApiManager(14430):      at bjwi.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):36)
+E/GoogleApiManager(14430):      at bjue.z(:com.google.android.gms@262031038@26.20.31 (260800-919905943):143)
+E/GoogleApiManager(14430):      at bjaj.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):42)
+E/GoogleApiManager(14430):      at android.os.Handler.handleCallback(Handler.java:1095)
+E/GoogleApiManager(14430):      at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+E/GoogleApiManager(14430):      at android.os.Handler.dispatchMessage(Handler.java:125)
+E/GoogleApiManager(14430):      at dbov.mL(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+E/GoogleApiManager(14430):      at dbov.dispatchMessage(:com.google.android.gms@262031038@26.20.31 (260800-919905943):5)
+E/GoogleApiManager(14430):      at android.os.Looper.loopOnce(Looper.java:296)
+E/GoogleApiManager(14430):      at android.os.Looper.loop(Looper.java:397)
+E/GoogleApiManager(14430):      at android.os.HandlerThread.run(HandlerThread.java:139)
+E/GoogleApiManager(14430): Failed to get service from broker. 
+E/GoogleApiManager(14430): java.lang.SecurityException: Unknown calling package name 'com.google.android.gms'.
+E/GoogleApiManager(14430):      at android.os.Parcel.createExceptionOrNull(Parcel.java:3392)
+E/GoogleApiManager(14430):      at android.os.Parcel.createException(Parcel.java:3376)
+E/GoogleApiManager(14430):      at android.os.Parcel.readException(Parcel.java:3359)
+E/GoogleApiManager(14430):      at android.os.Parcel.readException(Parcel.java:3301)
+E/GoogleApiManager(14430):      at bjwi.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):36)
+E/GoogleApiManager(14430):      at bjue.z(:com.google.android.gms@262031038@26.20.31 (260800-919905943):143)
+E/GoogleApiManager(14430):      at bjaj.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):42)
+E/GoogleApiManager(14430):      at android.os.Handler.handleCallback(Handler.java:1095)
+E/GoogleApiManager(14430):      at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+E/GoogleApiManager(14430):      at android.os.Handler.dispatchMessage(Handler.java:125)
+E/GoogleApiManager(14430):      at dbov.mL(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+E/GoogleApiManager(14430):      at dbov.dispatchMessage(:com.google.android.gms@262031038@26.20.31 (260800-919905943):5)
+E/GoogleApiManager(14430):      at android.os.Looper.loopOnce(Looper.java:296)
+E/GoogleApiManager(14430):      at android.os.Looper.loop(Looper.java:397)
+E/GoogleApiManager(14430):      at android.os.HandlerThread.run(HandlerThread.java:139)
+W/GoogleApiManager(14430): Not showing notification since connectionResult is not user-facing: ConnectionResult{statusCode=DEVELOPER_ERROR, resolution=null, message=null, clientMethodKey=null}
+W/FlagStore(14430): Unable to update local snapshot for com.google.android.gms.providerinstaller#com.blooddonation.chat, may result in stale flags.
+W/FlagStore(14430): java.util.concurrent.ExecutionException: gmma: 17: 17: API: Phenotype.API is not available on this device. Connection failed with: ConnectionResult{statusCode=DEVELOPER_ERROR, resolution=null, message=null, clientMethodKey=null}
+W/FlagStore(14430):     at hmli.j(:com.google.android.gms@262031038@26.20.31 (260800-919905943):21)
+W/FlagStore(14430):     at hmlr.t(:com.google.android.gms@262031038@26.20.31 (260800-919905943):24)
+W/FlagStore(14430):     at hmli.get(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagStore(14430):     at hmpx.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):2)
+W/FlagStore(14430):     at hmon.s(:com.google.android.gms@262031038@26.20.31 (260800-919905943):10)
+W/FlagStore(14430):     at gmrl.d(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagStore(14430):     at gmqp.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):5)
+W/FlagStore(14430):     at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:520)
+W/FlagStore(14430):     at java.util.concurrent.FutureTask.run(FutureTask.java:328)
+W/FlagStore(14430):     at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:323)
+W/FlagStore(14430):     at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1100)
+W/FlagStore(14430):     at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+W/FlagStore(14430):     at java.lang.Thread.run(Thread.java:1572)
+W/FlagStore(14430): Caused by: gmma: 17: 17: API: Phenotype.API is not available on this device. Connection failed with: ConnectionResult{statusCode=DEVELOPER_ERROR, resolution=null, message=null, clientMethodKey=null}
+W/FlagStore(14430):     at gmmc.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):13)
+W/FlagStore(14430):     at hmky.d(:com.google.android.gms@262031038@26.20.31 (260800-919905943):3)
+W/FlagStore(14430):     at hmla.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):139)
+W/FlagStore(14430):     at hmni.execute(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagStore(14430):     at hmli.f(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagStore(14430):     at hmli.m(:com.google.android.gms@262031038@26.20.31 (260800-919905943):101)
+W/FlagStore(14430):     at hmli.q(:com.google.android.gms@262031038@26.20.31 (260800-919905943):16)
+W/FlagStore(14430):     at gfwz.hC(:com.google.android.gms@262031038@26.20.31 (260800-919905943):35)
+W/FlagStore(14430):     at fser.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):12)
+W/FlagStore(14430):     at hmni.execute(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagStore(14430):     at fses.b(:com.google.android.gms@262031038@26.20.31 (260800-919905943):18)
+W/FlagStore(14430):     at fsfh.b(:com.google.android.gms@262031038@26.20.31 (260800-919905943):34)
+W/FlagStore(14430):     at fsfo.B(:com.google.android.gms@262031038@26.20.31 (260800-919905943):17)
+W/FlagStore(14430):     at fsej.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):60)
+W/FlagStore(14430):     at hmni.execute(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagStore(14430):     at fsek.b(:com.google.android.gms@262031038@26.20.31 (260800-919905943):8)
+W/FlagStore(14430):     at fsfh.b(:com.google.android.gms@262031038@26.20.31 (260800-919905943):34)
+W/FlagStore(14430):     at fsfj.d(:com.google.android.gms@262031038@26.20.31 (260800-919905943):22)
+W/FlagStore(14430):     at bixp.e(:com.google.android.gms@262031038@26.20.31 (260800-919905943):9)
+W/FlagStore(14430):     at bjah.q(:com.google.android.gms@262031038@26.20.31 (260800-919905943):48)
+W/FlagStore(14430):     at bjah.d(:com.google.android.gms@262031038@26.20.31 (260800-919905943):10)
+W/FlagStore(14430):     at bjah.g(:com.google.android.gms@262031038@26.20.31 (260800-919905943):191)
+W/FlagStore(14430):     at bjah.onConnectionFailed(:com.google.android.gms@262031038@26.20.31 (260800-919905943):2)
+W/FlagStore(14430):     at bjaj.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):70)
+W/FlagStore(14430):     at android.os.Handler.handleCallback(Handler.java:1095)
+W/FlagStore(14430):     at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+W/FlagStore(14430):     at android.os.Handler.dispatchMessage(Handler.java:125)
+W/FlagStore(14430):     at dbov.mL(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagStore(14430):     at dbov.dispatchMessage(:com.google.android.gms@262031038@26.20.31 (260800-919905943):5)
+W/FlagStore(14430):     at android.os.Looper.loopOnce(Looper.java:296)
+W/FlagStore(14430):     at android.os.Looper.loop(Looper.java:397)
+W/FlagStore(14430):     at android.os.HandlerThread.run(HandlerThread.java:139)
+W/FlagStore(14430): Caused by: bivu: 17: API: Phenotype.API is not available on this device. Connection failed with: ConnectionResult{statusCode=DEVELOPER_ERROR, resolution=null, message=null, clientMethodKey=null}
+W/FlagStore(14430):     at bjtq.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):15)
+W/FlagStore(14430):     at bixs.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+W/FlagStore(14430):     at bixp.e(:com.google.android.gms@262031038@26.20.31 (260800-919905943):5)
+W/FlagStore(14430):     ... 13 more
+I/flutter (14430): 💬 Stream1 (participant1) update: 1 docs
+I/flutter (14430): 💬 Stream1 emitting: 1 total conversations
+I/flutter (14430): 💬 Messages: Received 1 conversations
+I/flutter (14430):   - Conv: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f with usman & Iqraa
+D/nativeloader(14430): Load /data/app/~~siPLhhWWfJmf1bvQ20fyUA==/com.google.android.gms-0GJkmLgZt2-PCriFDaHwvw==/base.apk!/lib/x86_64/libconscrypt_gmscore_jni.so using class loader ns clns-10 (caller=/data/app/~~siPLhhWWfJmf1bvQ20fyUA==/com.google.android.gms-0GJkmLgZt2-PCriFDaHwvw==/base.apk): ok
+V/NativeCrypto(14430): Registering com/google/android/gms/org/conscrypt/NativeCrypto's 337 native methods...
+I/oddonation.chat(14430): hiddenapi: Accessing hidden method Ljava/security/spec/ECParameterSpec;->getCurveName()Ljava/lang/String; (runtime_flags=0, domain=core-platform, api=unsupported) from Lcom/google/android/gms/org/conscrypt/Platform; (domain=app, TargetSdkVersion=36) using reflection: allowed
+I/ProviderInstaller(14430): Installed default security provider GmsCore_OpenSSL
+I/oddonation.chat(14430): Background concurrent mark compact GC freed 2066KB AllocSpace bytes, 1(560KB) LOS objects, 49% free, 4938KB/9876KB, paused 488us,9.592ms total 35.604ms
+I/flutter (14430): 💬 Stream2 (participant2) update: 2 docs
+I/flutter (14430): 💬 Stream2 emitting: 3 total conversations
+I/flutter (14430): 💬 Messages: Received 3 conversations
+I/flutter (14430):   - Conv: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f with usman & Iqraa
+I/flutter (14430):   - Conv: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f with usman & Iqraa
+I/flutter (14430):   - Conv: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_9dba57d3-88ec-4ab7-9826-b96c4372a770 with usman & Iqraa
+I/oddonation.chat(14430): hiddenapi: Accessing hidden field Ljava/net/Socket;->impl:Ljava/net/SocketImpl; (runtime_flags=0, domain=core-platform, api=unsupported) from Lcom/google/android/gms/org/conscrypt/Platform; (domain=app, TargetSdkVersion=36) using reflection: allowed
+I/oddonation.chat(14430): hiddenapi: Accessing hidden method Ljava/security/spec/ECParameterSpec;->setCurveName(Ljava/lang/String;)V (runtime_flags=0, domain=core-platform, api=unsupported) from Lcom/google/android/gms/org/conscrypt/Platform; (domain=app, TargetSdkVersion=36) using reflection: allowed
+E/GoogleApiManager(14430): Failed to get service from broker. 
+E/GoogleApiManager(14430): java.lang.SecurityException: Unknown calling package name 'com.google.android.gms'.
+E/GoogleApiManager(14430):      at android.os.Parcel.createExceptionOrNull(Parcel.java:3392)
+E/GoogleApiManager(14430):      at android.os.Parcel.createException(Parcel.java:3376)
+E/GoogleApiManager(14430):      at android.os.Parcel.readException(Parcel.java:3359)
+E/GoogleApiManager(14430):      at android.os.Parcel.readException(Parcel.java:3301)
+E/GoogleApiManager(14430):      at bjwi.a(:com.google.android.gms@262031038@26.20.31 (260800-919905943):36)
+E/GoogleApiManager(14430):      at bjue.z(:com.google.android.gms@262031038@26.20.31 (260800-919905943):143)
+E/GoogleApiManager(14430):      at bjaj.run(:com.google.android.gms@262031038@26.20.31 (260800-919905943):42)
+E/GoogleApiManager(14430):      at android.os.Handler.handleCallback(Handler.java:1095)
+E/GoogleApiManager(14430):      at android.os.Handler.dispatchMessageImpl(Handler.java:135)
+E/GoogleApiManager(14430):      at android.os.Handler.dispatchMessage(Handler.java:125)
+E/GoogleApiManager(14430):      at dbov.mL(:com.google.android.gms@262031038@26.20.31 (260800-919905943):1)
+E/GoogleApiManager(14430):      at dbov.dispatchMessage(:com.google.android.gms@262031038@26.20.31 (260800-919905943):5)
+E/GoogleApiManager(14430):      at android.os.Looper.loopOnce(Looper.java:296)
+E/GoogleApiManager(14430):      at android.os.Looper.loop(Looper.java:397)
+E/GoogleApiManager(14430):      at android.os.HandlerThread.run(HandlerThread.java:139)
+W/GoogleApiManager(14430): Not showing notification since connectionResult is not user-facing: ConnectionResult{statusCode=DEVELOPER_ERROR, resolution=null, message=null, clientMethodKey=null}
+D/WindowOnBackDispatcher(14430): setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@57fbaa
+I/flutter (14430): 🔍 Authentication check: AUTHENTICATED
+I/flutter (14430): 🔄 Switching role to: "donor"
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔄 Updating user role to: "donor"
+I/flutter (14430): 📤 Request body: {"role":"donor"}
+I/flutter (14430): 📤 Request headers: {Content-Type: application/json, Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgxNTE4OTE1LCJpYXQiOjE3ODE1MTUzMTUsImp0aSI6IjRmNWU0YTFkMDk1YjRkYjU5ODg3NjdjNTVlOTJkOTc0IiwidXNlcl9pZCI6IjUyYjg2ZDg0LTNkNDQtNDEyMS05MDAwLTk3YjA5YzNkODg2ZiJ9.pbhYSVQKw9z8LHRfh1uV1yGE-8VjSj7WegJH74YyJmA}
+I/flutter (14430): 📊 Role update response status: 200
+I/flutter (14430): 📄 Role update response body: {"success":true,"message":"Role updated to Donor successfully.","user":{"id":"52b86d84-3d44-4121-9000-97b09c3d886f","email":"iqraa@gmail.com","full_name":"Iqraa","phone_num":"","phone_verified":false,"date_joined":"2026-06-15T07:26:14.681434Z","last_login":null,"role":"donor"}}
+I/flutter (14430): 📊 Parsed response data: {success: true, message: Role updated to Donor successfully., user: {id: 52b86d84-3d44-4121-9000-97b09c3d886f, email: iqraa@gmail.com, full_name: Iqraa, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:26:14.681434Z, last_login: null, role: donor}}
+I/flutter (14430): ✅ User role updated successfully to: donor
+I/flutter (14430): 📊 Role update API response: true
+I/flutter (14430): 💾 setRole called with: "donor"
+I/flutter (14430): 💾 _currentRole is now: "donor"
+I/flutter (14430): 💾 Saved role to SharedPreferences: "donor"
+I/flutter (14430): 📢 Notified listeners after setRole
+I/flutter (14430): ✅ Role switched successfully to: donor
+I/flutter (14430): ✅ Current role in provider: donor
+I/flutter (14430): 🔍 Authentication check: AUTHENTICATED
+I/flutter (14430): 🔄 Fetching current user role from API...
+I/flutter (14430): 🔄 Role changed in MainNavigationScreen, reloading data...
+I/flutter (14430): 📋 Fetching blood requests...
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+D/WindowOnBackDispatcher(14430): setTopOnBackInvokedCallback (unwrapped): io.flutter.embedding.android.FlutterActivity$1@e743a1a
+D/WindowOnBackDispatcher(14430): setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@57fbaa
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: b9965223-a4b7-40ce-8fb1-87f00725bcaa, user_full_name: Iqraa, email: iqraa@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: A+, age: 22, gender: female, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2003-06-19, created_at: 2026-06-15T07:26:41.958047Z, updated_at: 2026-06-15T07:26:41.958047Z}, user: {id: 52b86d84-3d44-4121-9000-97b09c3d886f, email: iqraa@gmail.com, full_name: Iqraa, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:26:14.681434Z, last_login: null, role: donor}}}
+I/flutter (14430): 🎯 Extracted role: "donor"
+I/flutter (14430): 💾 setRole called with: "donor"
+I/flutter (14430): 💾 _currentRole is now: "donor"
+I/flutter (14430): 💾 Saved role to SharedPreferences: "donor"
+I/flutter (14430): 🔄 Role changed in MainNavigationScreen, reloading data...
+I/flutter (14430): 📋 Fetching blood requests...
+I/flutter (14430): 📢 Notified listeners after setRole
+I/flutter (14430): ✅ Role set to: donor
+I/flutter (14430): 🔄 Role changed in MainNavigationScreen, reloading data...
+I/flutter (14430): 📋 Fetching blood requests...
+I/flutter (14430): 📱 User role: donor
+I/flutter (14430): 📋 Fetching blood requests...
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 📊 Blood requests response status: 200
+I/flutter (14430): 📋 Blood requests data: 20 requests
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: b9965223-a4b7-40ce-8fb1-87f00725bcaa, user_full_name: Iqraa, email: iqraa@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: A+, age: 22, gender: female, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2003-06-19, created_at: 2026-06-15T07:26:41.958047Z, updated_at: 2026-06-15T07:26:41.958047Z}, user: {id: 52b86d84-3d44-4121-9000-97b09c3d886f, email: iqraa@gmail.com, full_name: Iqraa, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:26:14.681434Z, last_login: null, role: donor}}}
+I/flutter (14430): 📊 Profile data keys: [success, message, profile, user]
+I/flutter (14430): 📊 Using full profile data
+I/flutter (14430): 🏠 Building body for role: donor
+I/flutter (14430):    isDonor: true
+I/flutter (14430):    isPatient: false
+I/flutter (14430): 📊 Blood requests response status: 200
+I/flutter (14430): 📋 Blood requests data: 20 requests
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: b9965223-a4b7-40ce-8fb1-87f00725bcaa, user_full_name: Iqraa, email: iqraa@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: A+, age: 22, gender: female, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2003-06-19, created_at: 2026-06-15T07:26:41.958047Z, updated_at: 2026-06-15T07:26:41.958047Z}, user: {id: 52b86d84-3d44-4121-9000-97b09c3d886f, email: iqraa@gmail.com, full_name: Iqraa, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:26:14.681434Z, last_login: null, role: donor}}}
+I/flutter (14430): 📊 Profile data keys: [success, message, profile, user]
+I/flutter (14430): 📊 Using full profile data
+I/flutter (14430): 📊 Blood requests response status: 200
+I/flutter (14430): 📋 Blood requests data: 20 requests
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: b9965223-a4b7-40ce-8fb1-87f00725bcaa, user_full_name: Iqraa, email: iqraa@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: A+, age: 22, gender: female, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2003-06-19, created_at: 2026-06-15T07:26:41.958047Z, updated_at: 2026-06-15T07:26:41.958047Z}, user: {id: 52b86d84-3d44-4121-9000-97b09c3d886f, email: iqraa@gmail.com, full_name: Iqraa, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:26:14.681434Z, last_login: null, role: donor}}}
+I/flutter (14430): 📊 Profile data keys: [success, message, profile, user]
+I/flutter (14430): 📊 Using full profile data
+I/flutter (14430): 📊 Blood requests response status: 200
+I/flutter (14430): 📋 Blood requests data: 20 requests
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: b9965223-a4b7-40ce-8fb1-87f00725bcaa, user_full_name: Iqraa, email: iqraa@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: A+, age: 22, gender: female, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2003-06-19, created_at: 2026-06-15T07:26:41.958047Z, updated_at: 2026-06-15T07:26:41.958047Z}, user: {id: 52b86d84-3d44-4121-9000-97b09c3d886f, email: iqraa@gmail.com, full_name: Iqraa, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:26:14.681434Z, last_login: null, role: donor}}}
+I/flutter (14430): 📊 Profile data keys: [success, message, profile, user]
+I/flutter (14430): 📊 Using full profile data
+I/flutter (14430): 🏠 Building body for role: donor
+I/flutter (14430):    isDonor: true
+I/flutter (14430):    isPatient: false
+I/flutter (14430): 🏠 Building body for role: donor
+I/flutter (14430):    isDonor: true
+I/flutter (14430):    isPatient: false
+I/flutter (14430): 🔍 Authentication check: AUTHENTICATED
+I/flutter (14430): 📋 Fetching my pledges...
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+D/WindowOnBackDispatcher(14430): setTopOnBackInvokedCallback (unwrapped): io.flutter.embedding.android.FlutterActivity$1@e743a1a
+I/flutter (14430): 📊 My pledges response status: 200
+I/flutter (14430): 📋 Fetching blood requests...
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 📊 Blood requests response status: 200
+I/flutter (14430): 📋 Blood requests data: 20 requests
+I/flutter (14430): 🔍 Authentication check: AUTHENTICATED
+I/flutter (14430): 🔑 Loaded userId: 52b86d84-3d44-4121-9000-97b09c3d886f, isAuthenticated: true
+I/flutter (14430): 📋 Fetching blood request detail: 36819c10-8867-4f22-b34a-b9bda012c5fe
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 📊 Blood request detail response status: 200
+I/flutter (14430): 📋 Fetching pledges for request: 36819c10-8867-4f22-b34a-b9bda012c5fe
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔍 Authentication check: AUTHENTICATED
+I/flutter (14430): 🏥 Checking donor eligibility...
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 📊 Eligibility response status: 200
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔍 Initializing chat for conversation: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 🔍 Current user: 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 🔍 Other participant: Iqraa
+I/flutter (14430): 🔍 Initializing chat for conversation: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 🔍 Current user: 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 🔍 Other participant: Iqraa
+I/flutter (14430): ✅ Firebase initialized
+I/flutter (14430): ✅ Firebase initialized
+I/flutter (14430): 🔍 Setting up messages stream...
+I/flutter (14430): 🔍 Setting up messages stream for conversation: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): ✅ Chat initialization complete
+I/flutter (14430): 🔍 Setting up messages stream...
+I/flutter (14430): 🔍 Setting up messages stream for conversation: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): ✅ Chat initialization complete
+I/flutter (14430): 💬 Firestore snapshot received: 5 messages
+I/flutter (14430):    - Parsed message: "hi 
+I/flutter (14430): I am avaible to donate blood" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hellooo" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "how are you" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hello" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hi" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 💬 Returning 5 messages to UI
+I/flutter (14430): 💬 Messages stream update: 5 messages received
+I/flutter (14430):    - Message: "hi 
+I/flutter (14430): I am avaible to donate blood" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hellooo" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "how are you" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hello" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hi" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430): 💬 Firestore snapshot received: 5 messages
+I/flutter (14430):    - Parsed message: "hi 
+I/flutter (14430): I am avaible to donate blood" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hellooo" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "how are you" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hello" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hi" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 💬 Returning 5 messages to UI
+I/flutter (14430): 💬 Messages stream update: 5 messages received
+I/flutter (14430):    - Message: "hi 
+I/flutter (14430): I am avaible to donate blood" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hellooo" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "how are you" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hello" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hi" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/ImeTracker(14430): com.blooddonation.chat:a5b78a2f: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false userId 0 displayId 0
+D/InsetsController(14430): show(ime())
+D/InsetsController(14430): Setting requestedVisibleTypes to 511 (was 503)
+D/InputConnectionAdaptor(14430): The input method toggled cursor monitoring on
+I/AssistStructure(14430): Flattened final assist data: 504 bytes, containing 1 windows, 3 views
+D/WindowOnBackDispatcher(14430): setTopOnBackInvokedCallback (unwrapped): android.view.ImeBackAnimationController@bebd470
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+I/ImeTracker(14430): com.blooddonation.chat:a5b78a2f: onShown
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+I/flutter (14430): 💬 Sending message:
+I/flutter (14430):   Conversation ID: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):   Sender ID: 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):   Sender Name: usman
+I/flutter (14430):   Receiver ID: 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):   Text: testing
+I/flutter (14430): 💬 Firebase: Network check result: true
+I/flutter (14430): 💬 Firebase: Sending message to conversation conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 💬 Firebase: Generated message ID: kRO7uVqTiVIKsvr3gwIV
+I/flutter (14430): 💬 Firebase: Message data: (id, conversation_id, sender_id, sender_name, text, ..., is_read, receiver_id)
+I/flutter (14430): 💬 Firestore snapshot received: 6 messages
+I/flutter (14430):    - Parsed message: "hi 
+I/flutter (14430): I am avaible to donate blood" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hellooo" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "how are you" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hello" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hi" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "testing" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 💬 Returning 6 messages to UI
+I/flutter (14430): 💬 Messages stream update: 6 messages received
+I/flutter (14430):    - Message: "hi 
+I/flutter (14430): I am avaible to donate blood" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hellooo" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "how are you" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hello" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hi" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "testing" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430): 💬 Firestore snapshot received: 6 messages
+I/flutter (14430):    - Parsed message: "hi 
+I/flutter (14430): I am avaible to donate blood" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hellooo" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "how are you" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hello" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "hi" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430):    - Parsed message: "testing" from 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 💬 Returning 6 messages to UI
+I/flutter (14430): 💬 Messages stream update: 6 messages received
+I/flutter (14430):    - Message: "hi 
+I/flutter (14430): I am avaible to donate blood" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hellooo" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "how are you" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hello" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "hi" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430):    - Message: "testing" from usman (52b86d84-3d44-4121-9000-97b09c3d886f)
+I/flutter (14430): 💬 Firebase: Message document created
+I/flutter (14430): 💬 Stream1 (participant1) update: 1 docs
+I/flutter (14430): 💬 Stream1 emitting: 3 total conversations
+I/flutter (14430): 💬 Stream2 (participant2) update: 2 docs
+I/flutter (14430): 💬 Stream2 emitting: 3 total conversations
+I/flutter (14430): 💬 Firebase: Conversation updated successfully
+I/flutter (14430): ✅ Message sent successfully!
+I/ImeTracker(14430): com.blooddonation.chat:daa4f73c: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+D/InsetsController(14430): hide(ime())
+D/WindowOnBackDispatcher(14430): setTopOnBackInvokedCallback (unwrapped): io.flutter.embedding.android.FlutterActivity$1@e743a1a
+D/InsetsController(14430): Setting requestedVisibleTypes to 503 (was 511)
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+I/ImeTracker(14430): system_server:74415414: onCancelled at PHASE_CLIENT_ON_CONTROLS_CHANGED
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+I/flutter (14430): 💬 Messages: Initializing chat...
+I/flutter (14430): 💬 Messages: Firebase initialized
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 💬 Messages: Current user ID: 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 💬 Messages: Starting to listen for conversations...
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 💬 getUserConversationsStream: User ID = 52b86d84-3d44-4121-9000-97b09c3d886f
+I/flutter (14430): 💬 Starting to yield from controller stream
+I/flutter (14430): 💬 Stream1 (participant1) update: 1 docs
+I/flutter (14430): 💬 Stream1 emitting: 1 total conversations
+I/flutter (14430): 💬 Stream2 (participant2) update: 2 docs
+I/flutter (14430): 💬 Stream2 emitting: 3 total conversations
+I/flutter (14430): 💬 Messages: Received 1 conversations
+I/flutter (14430):   - Conv: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f with usman & Iqraa
+I/flutter (14430): 💬 Messages: Received 3 conversations
+I/flutter (14430):   - Conv: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f with usman & Iqraa
+I/flutter (14430):   - Conv: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_52b86d84-3d44-4121-9000-97b09c3d886f with usman & Iqraa
+I/flutter (14430):   - Conv: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_9dba57d3-88ec-4ab7-9826-b96c4372a770 with usman & Iqraa
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/oddonation.chat(14430): Background young concurrent mark compact GC freed 3946KB AllocSpace bytes, 0(0B) LOS objects, 43% free, 5568KB/9876KB, paused 1.770ms,24.517ms total 117.762ms
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+D/WindowOnBackDispatcher(14430): setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@57fbaa
+I/flutter (14430): 🔍 Authentication check: NOT AUTHENTICATED
+I/flutter (14430): 🔑 Login with role: patient
+D/WindowOnBackDispatcher(14430): setTopOnBackInvokedCallback (unwrapped): io.flutter.embedding.android.FlutterActivity$1@e743a1a
+I/ImeTracker(14430): com.blooddonation.chat:a8d2c4b7: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false userId 0 displayId 0
+D/InsetsController(14430): show(ime())
+D/InsetsController(14430): Setting requestedVisibleTypes to 511 (was 503)
+D/InputConnectionAdaptor(14430): The input method toggled cursor monitoring on
+I/AssistStructure(14430): Flattened final assist data: 480 bytes, containing 1 windows, 3 views
+D/WindowOnBackDispatcher(14430): setTopOnBackInvokedCallback (unwrapped): android.view.ImeBackAnimationController@bebd470
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+I/ImeTracker(14430): com.blooddonation.chat:a8d2c4b7: onShown
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+I/ImeTracker(14430): com.blooddonation.chat:da7a4a8: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false userId 0 displayId 0
+D/InsetsController(14430): show(ime())
+I/ImeTracker(14430): com.blooddonation.chat:da7a4a8: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+I/AssistStructure(14430): Flattened final assist data: 488 bytes, containing 1 windows, 3 views
+D/InputConnectionAdaptor(14430): The input method toggled cursor monitoring on
+I/flutter (14430): 👤 User role from login: patient
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 👤 Final user role: patient
+I/flutter (14430): 📄 Profile data: {id: 663d174d-ff5f-4df1-9599-8c1e15b43872, user_full_name: usman, email: usman@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: O+, age: 23, gender: male, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2002-06-19, created_at: 2026-06-15T07:23:42.722837Z, updated_at: 2026-06-15T07:23:42.722837Z}
+I/flutter (14430): 👤 User data: {id: 9dba57d3-88ec-4ab7-9826-b96c4372a770, email: usman@gmail.com, full_name: usman, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:23:16.413356Z, last_login: null, role: patient}
+I/flutter (14430): 🏠 Navigating to MAIN NAVIGATION (unified screen)
+I/flutter (14430): 🔑 Login with role: patient
+I/flutter (14430): 🔍 Authentication check: AUTHENTICATED
+I/flutter (14430): 🔄 Fetching current user role from API...
+I/flutter (14430): 🔄 Role changed in MainNavigationScreen, reloading data...
+I/flutter (14430): 📋 Fetching blood requests...
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/ImeTracker(14430): com.blooddonation.chat:148b1209: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false userId 0 displayId 0
+D/InsetsController(14430): hide(ime())
+D/WindowOnBackDispatcher(14430): setTopOnBackInvokedCallback (unwrapped): io.flutter.embedding.android.FlutterActivity$1@e743a1a
+D/InsetsController(14430): Setting requestedVisibleTypes to 503 (was 511)
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+I/ImeTracker(14430): system_server:ca436673: onCancelled at PHASE_CLIENT_ON_CONTROLS_CHANGED
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+D/FlutterJNI(14430): Sending viewport metrics to the engine.
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: 663d174d-ff5f-4df1-9599-8c1e15b43872, user_full_name: usman, email: usman@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: O+, age: 23, gender: male, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2002-06-19, created_at: 2026-06-15T07:23:42.722837Z, updated_at: 2026-06-15T07:23:42.722837Z}, user: {id: 9dba57d3-88ec-4ab7-9826-b96c4372a770, email: usman@gmail.com, full_name: usman, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:23:16.413356Z, last_login: null, role: patient}}}
+I/flutter (14430): 🎯 Extracted role: "patient"
+I/flutter (14430): 💾 setRole called with: "patient"
+I/flutter (14430): 💾 _currentRole is now: "patient"
+I/flutter (14430): 💾 Saved role to SharedPreferences: "patient"
+I/flutter (14430): 🔄 Role changed in MainNavigationScreen, reloading data...
+I/flutter (14430): 📋 Fetching blood requests...
+I/flutter (14430): 📢 Notified listeners after setRole
+I/flutter (14430): ✅ Role set to: patient
+I/flutter (14430): 🔄 Role changed in MainNavigationScreen, reloading data...
+I/flutter (14430): 📋 Fetching blood requests...
+I/flutter (14430): 📱 User role: patient
+I/flutter (14430): 📋 Fetching blood requests...
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 📊 Blood requests response status: 200
+I/flutter (14430): 📋 Blood requests data: 19 requests
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: 663d174d-ff5f-4df1-9599-8c1e15b43872, user_full_name: usman, email: usman@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: O+, age: 23, gender: male, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2002-06-19, created_at: 2026-06-15T07:23:42.722837Z, updated_at: 2026-06-15T07:23:42.722837Z}, user: {id: 9dba57d3-88ec-4ab7-9826-b96c4372a770, email: usman@gmail.com, full_name: usman, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:23:16.413356Z, last_login: null, role: patient}}}
+I/flutter (14430): 📊 Profile data keys: [success, message, profile, user]
+I/flutter (14430): 📊 Using full profile data
+I/flutter (14430): 🏠 Building body for role: patient
+I/flutter (14430):    isDonor: false
+I/flutter (14430):    isPatient: true
+I/flutter (14430): 📊 Blood requests response status: 200
+I/flutter (14430): 📋 Blood requests data: 19 requests
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: 663d174d-ff5f-4df1-9599-8c1e15b43872, user_full_name: usman, email: usman@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: O+, age: 23, gender: male, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2002-06-19, created_at: 2026-06-15T07:23:42.722837Z, updated_at: 2026-06-15T07:23:42.722837Z}, user: {id: 9dba57d3-88ec-4ab7-9826-b96c4372a770, email: usman@gmail.com, full_name: usman, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:23:16.413356Z, last_login: null, role: patient}}}
+I/flutter (14430): 📊 Profile data keys: [success, message, profile, user]
+I/flutter (14430): 📊 Using full profile data
+I/flutter (14430): 📊 Blood requests response status: 200
+I/flutter (14430): 📋 Blood requests data: 19 requests
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: 663d174d-ff5f-4df1-9599-8c1e15b43872, user_full_name: usman, email: usman@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: O+, age: 23, gender: male, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2002-06-19, created_at: 2026-06-15T07:23:42.722837Z, updated_at: 2026-06-15T07:23:42.722837Z}, user: {id: 9dba57d3-88ec-4ab7-9826-b96c4372a770, email: usman@gmail.com, full_name: usman, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:23:16.413356Z, last_login: null, role: patient}}}
+I/flutter (14430): 📊 Profile data keys: [success, message, profile, user]
+I/flutter (14430): 📊 Using full profile data
+I/flutter (14430): 📊 Blood requests response status: 200
+I/flutter (14430): 📋 Blood requests data: 19 requests
+I/flutter (14430): 📊 Profile result: {success: true, data: {success: true, message: Profile retrieved successfully., profile: {id: 663d174d-ff5f-4df1-9599-8c1e15b43872, user_full_name: usman, email: usman@gmail.com, username: null, profile_picture: null, profile_picture_url: null, blood_group: O+, age: 23, gender: male, weight: 50.00, location_lat: null, location_lng: null, address: null, city: lahore, state: null, country: Pakistan, postal_code: null, is_available_for_donation: false, last_donation_date: null, total_donations: 0, eligibility_verified: false, eligibility_valid_until: null, is_eligible: false, next_eligible_date: null, eligibility_reason: null, medications: [], allergies: [], health_conditions: [], date_of_birth: 2002-06-19, created_at: 2026-06-15T07:23:42.722837Z, updated_at: 2026-06-15T07:23:42.722837Z}, user: {id: 9dba57d3-88ec-4ab7-9826-b96c4372a770, email: usman@gmail.com, full_name: usman, phone_num: , phone_verified: false, date_joined: 2026-06-15T07:23:16.413356Z, last_login: null, role: patient}}}
+I/flutter (14430): 📊 Profile data keys: [success, message, profile, user]
+I/flutter (14430): 📊 Using full profile data
+I/flutter (14430): 🏠 Building body for role: patient
+I/flutter (14430):    isDonor: false
+I/flutter (14430):    isPatient: true
+I/flutter (14430): 💬 Messages: Initializing chat...
+I/flutter (14430): 🏠 Building body for role: patient
+I/flutter (14430):    isDonor: false
+I/flutter (14430):    isPatient: true
+I/flutter (14430): 💬 Messages: Firebase initialized
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 💬 Messages: Current user ID: 9dba57d3-88ec-4ab7-9826-b96c4372a770
+I/flutter (14430): 💬 Messages: Starting to listen for conversations...
+I/flutter (14430): 🔑 Token for API call: Present (eyJhbGciOiJIUzI1NiIs...)
+I/flutter (14430): 💬 getUserConversationsStream: User ID = 9dba57d3-88ec-4ab7-9826-b96c4372a770
+I/flutter (14430): 💬 Starting to yield from controller stream
+I/flutter (14430): 💬 Stream1 (participant1) update: 1 docs
+I/flutter (14430): 💬 Stream1 emitting: 1 total conversations
+I/flutter (14430): 💬 Messages: Received 1 conversations
+I/flutter (14430):   - Conv: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_9dba57d3-88ec-4ab7-9826-b96c4372a770 with usman & Iqraa
+I/flutter (14430): 💬 Stream2 (participant2) update: 0 docs
+I/flutter (14430): 💬 Stream2 emitting: 1 total conversations
+I/flutter (14430): 💬 Messages: Received 1 conversations
+I/flutter (14430):   - Conv: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_9dba57d3-88ec-4ab7-9826-b96c4372a770 with usman & Iqraa
+I/flutter (14430): 🔍 Initializing chat for conversation: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_9dba57d3-88ec-4ab7-9826-b96c4372a770
+I/flutter (14430): 🔍 Current user: 9dba57d3-88ec-4ab7-9826-b96c4372a770
+I/flutter (14430): 🔍 Other participant: Iqraa
+I/flutter (14430): ✅ Firebase initialized
+I/flutter (14430): 🔍 Setting up messages stream...
+I/flutter (14430): 🔍 Setting up messages stream for conversation: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_9dba57d3-88ec-4ab7-9826-b96c4372a770
+I/flutter (14430): ✅ Chat initialization complete
+I/flutter (14430): 💬 Firestore snapshot received: 1 messages
+I/flutter (14430):    - Parsed message: "🎉 You pledged to donate O+ blood to usman!" from system
+I/flutter (14430): 💬 Returning 1 messages to UI
+I/flutter (14430): 💬 Messages stream update: 1 messages received
+I/flutter (14430):    - Message: "🎉 You pledged to donate O+ blood to usman!" from System (system)
+I/flutter (14430): 🔍 Initializing chat for conversation: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_9dba57d3-88ec-4ab7-9826-b96c4372a770
+I/flutter (14430): 🔍 Current user: 9dba57d3-88ec-4ab7-9826-b96c4372a770
+I/flutter (14430): 🔍 Other participant: Iqraa
+I/flutter (14430): ✅ Firebase initialized
+I/flutter (14430): 🔍 Setting up messages stream...
+I/flutter (14430): 🔍 Setting up messages stream for conversation: conv_36819c10-8867-4f22-b34a-b9bda012c5fe_52b86d84-3d44-4121-9000-97b09c3d886f_9dba57d3-88ec-4ab7-9826-b96c4372a770
+I/flutter (14430): ✅ Chat initialization complete
+I/flutter (14430): 💬 Firestore snapshot received: 1 messages
+I/flutter (14430):    - Parsed message: "🎉 You pledged to donate O+ blood to usman!" from system
+I/flutter (14430): 💬 Returning 1 messages to UI
+I/flutter (14430): 💬 Messages stream update: 1 messages received
+I/flutter (14430):    - Message: "🎉 You pledged to donate O+ blood to usman!" from System (system)
+
+

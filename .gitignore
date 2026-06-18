@@ -1,0 +1,167 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# =========================
+# Virtual Environment
+# =========================
+.venv/
+venv/
+ENV/
+env/
+
+# =========================
+# Django
+# =========================
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+/media/
+/static/
+/staticfiles/
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.local
+.env.*.local
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# =========================
+# Flutter / Dart
+# =========================
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+.gen_flutter_project_artifacts/
+.pub.log
+.downloadIntermediates/
+.temp/
+
+# Flutter build files
+build/
+**/build/
+
+# Flutter platform-specific build artifacts
+flutter_project/flutter_app/windows/flutter/ephemeral/
+flutter_project/flutter_app/linux/flutter/ephemeral/
+flutter_project/flutter_app/macos/Flutter/ephemeral/
+flutter_project/flutter_app/web/
+
+# =========================
+# Android
+# =========================
+**/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/.gradle/
+android/app/build/
+android/local.properties
+android/.properties
+android/captures/
+android/app/src/debug/
+android/app/src/profile/
+
+# =========================
+# iOS
+# =========================
+ios/Pods/
+ios/.symlinks/
+ios/profile/
+ios/DerivedData/
+ios/Runner.xcworkspace/
+ios/Podfile.lock
+ios/.generated/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+
+# =========================
+# Emulator / System Images
+# =========================
+**/emulator/
+**/system-images/
+**/avd/
+
+# =========================
+# Android SDK Tools (downloaded locally)
+# =========================
+**/platform-tools/
+**/platforms/
+**/build-tools/
+**/sources/
+**/skins/
+**/licenses/
+**/avd/
+
+# Large generated files
+*.img
+*.exe
+*.apk
+*.aab
+*.app
+*.ipa
+
+# =========================
+# Firebase
+# =========================
+firebase-credentials.json
+service-account-key.json
+
+# =========================
+# Logs
+# =========================
+logs/
+django-backend/logs/
+
+# =========================
+# Uploaded Files
+# =========================
+django-backend/profile_pictures/*
+!django-backend/profile_pictures/.gitkeep
+
+# =========================
+# Test Coverage
+# =========================
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+*.cover

@@ -1,0 +1,1 @@
+# Blood types management package
