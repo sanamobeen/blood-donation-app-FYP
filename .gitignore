@@ -11,7 +11,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/ and lib64/ are for Python setuptools - don't ignore Flutter's lib/
 lib64/
 parts/
 sdist/
