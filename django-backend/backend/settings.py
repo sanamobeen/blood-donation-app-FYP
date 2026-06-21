@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     'django_celery_beat',  # Celery Beat for scheduled tasks
     # Phase 8: Chat System
     'chat',  # Private messaging between patients and donors
+    # AI Chatbot Assistant
+    'assistant',  # AI-powered FAQ chatbot
 ]
 
 MIDDLEWARE = [
