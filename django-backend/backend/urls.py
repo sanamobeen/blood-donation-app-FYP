@@ -29,6 +29,8 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
     # Phase 8: Chat System
     path('api/chat/', include('chat.urls')),
+    # AI Chatbot Assistant
+    path('api/assistant/', include('assistant.urls')),
     # Admin endpoints
     path('api/admin/', include('account.admin_urls')),
     path('api/admin/stats/', include('stats.admin_urls')),

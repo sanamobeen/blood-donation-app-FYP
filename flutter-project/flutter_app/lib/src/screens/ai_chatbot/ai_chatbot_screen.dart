@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_theme.dart';
 import '../../models/ai_chat_message.dart';
 import '../../services/ai_chat_service.dart';
@@ -18,20 +19,48 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
   final AIChatService _chatService = AIChatService.instance;
   List<AIChatMessage> _messages = [];
   bool _isSending = false;
+  String _userRole = 'both';
 
-  // Quick prompts for blood donation related queries
-  final List<Map<String, String>> _quickPrompts = [
+  // Donor-specific quick prompts
+  final List<Map<String, String>> _donorPrompts = [
     {'icon': '🩸', 'title': 'Am I eligible to donate?', 'message': 'Am I eligible to donate blood?'},
     {'icon': '⏱️', 'title': 'How does donation work?', 'message': 'How does the blood donation process work?'},
     {'icon': '💪', 'title': 'Benefits of donating', 'message': 'What are the benefits of donating blood?'},
     {'icon': '📍', 'title': 'Find donation center', 'message': 'Where can I find a donation center nearby?'},
-    {'icon': '🆘', 'title': 'Urgent blood needed', 'message': 'I need urgent blood help'},
-    {'icon': '❓', 'title': 'Blood type info', 'message': 'Tell me about blood types'},
+    {'icon': '❓', 'title': 'Blood type compatibility', 'message': 'Who can I donate my blood to?'},
+    {'icon': '🔄', 'title': 'How often to donate?', 'message': 'How often can I donate blood?'},
   ];
+
+  // Patient-specific quick prompts
+  final List<Map<String, String>> _patientPrompts = [
+    {'icon': '🩸', 'title': 'Who can donate to me?', 'message': 'Who can donate blood to me?'},
+    {'icon': '🆘', 'title': 'Urgent blood needed', 'message': 'I need urgent blood help'},
+    {'icon': '📍', 'title': 'Find donors nearby', 'message': 'How do I find blood donors nearby?'},
+    {'icon': '❓', 'title': 'Blood type compatibility', 'message': 'What donors match my blood type?'},
+    {'icon': '🏥', 'title': 'Request blood process', 'message': 'How do I request blood for a patient?'},
+    {'icon': '💬', 'title': 'Message a donor', 'message': 'How can I contact potential donors?'},
+  ];
+
+  // Get appropriate quick prompts based on user role
+  List<Map<String, String>> get _quickPrompts {
+    if (_userRole == 'donor') {
+      return _donorPrompts;
+    } else if (_userRole == 'patient') {
+      return _patientPrompts;
+    } else {
+      // Default prompts for when role is not set
+      return [
+        {'icon': '🩸', 'title': 'Am I eligible to donate?', 'message': 'Am I eligible to donate blood?'},
+        {'icon': '🆘', 'title': 'Urgent blood needed', 'message': 'I need urgent blood help'},
+        {'icon': '❓', 'title': 'Blood type info', 'message': 'Tell me about blood types'},
+      ];
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadUserRole();
     _initializeChat();
 
     // Listen to message stream
@@ -42,6 +71,13 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
         });
         _scrollToBottom();
       }
+    });
+  }
+
+  Future<void> _loadUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userRole = prefs.getString('user_role') ?? 'both';
     });
   }
 
@@ -59,7 +95,7 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
-            _scrollController.position.minScrollExtent,
+            _scrollController.position.maxScrollExtent,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
           );
@@ -78,6 +114,8 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
 
     try {
       await _chatService.sendMessage(messageText);
+      // Scroll to bottom after sending to show the response
+      _scrollToBottom();
     } catch (e) {
       _showError('Failed to send message: $e');
     } finally {
