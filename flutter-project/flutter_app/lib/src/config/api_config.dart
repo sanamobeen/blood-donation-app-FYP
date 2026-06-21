@@ -62,6 +62,7 @@ class ApiConfig {
   static String get statsEndpoint => '${getBaseUrl()}/api/stats';
   static String get messagesEndpoint => '${getBaseUrl()}/api/messages';
   static String get chatEndpoint => '${getBaseUrl()}/api/chat';
+  static String get assistantEndpoint => '${getBaseUrl()}/api/assistant';
   static String get notificationsEndpoint => '${getBaseUrl()}/api/notifications';
   static String get achievementsEndpoint => '${getBaseUrl()}/api/achievements';
   static String get healthEndpoint => '${getBaseUrl()}/api/health';
