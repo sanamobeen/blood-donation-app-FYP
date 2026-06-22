@@ -148,6 +148,8 @@ ios/Flutter/Flutter.framework
 # =========================
 firebase-credentials.json
 service-account-key.json
+firebase-service-account.json
+django-backend/firebase-service-account.json
 
 # =========================
 # Logs
