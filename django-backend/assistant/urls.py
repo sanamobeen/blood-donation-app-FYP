@@ -9,6 +9,7 @@ app_name = 'assistant'
 urlpatterns = [
     # Chat endpoints
     path('chat/', views.chat, name='chat'),
+    path('chat-stream/', views.chat_stream, name='chat_stream'),
     path('health/', views.health_check, name='health_check'),
 
     # FAQ endpoints
