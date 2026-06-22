@@ -5,9 +5,11 @@ import '../../app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/role_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/firebase_chat_service.dart';
 import '../../models/profile.dart';
 import '../../models/blood_request.dart';
 import '../../widgets/bottom_navigation_bar.dart';
+import '../chat/chat_conversation_screen.dart';
 import '../donors/donor_profile_screen.dart';
 import '../requests/blood_request_detail_screen.dart';
 import '../role/role_switch_screen.dart';
@@ -28,10 +30,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Profile? _userProfile;
   String? _errorMessage;
   RoleProvider? _roleProvider;
+  bool _isAcceptingPledge = false; // Add flag to prevent double clicks
 
   // Blood requests data
   BloodRequestListResponse? _requestsResponse;
   bool _isLoadingRequests = true;
+
+  // Responding donors data (for patients)
+  List<Map<String, dynamic>> _respondingDonors = [];
+  bool _isLoadingDonors = true;
+  int _totalDonorsCount = 0;
+
+  // Notification data
+  int _unreadCount = 0;
+  int _chatUnreadCount = 0;
 
   @override
   void initState() {
@@ -84,6 +96,34 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (mounted) {
       _loadData();
+      _loadUnreadCount();
+      _loadChatUnreadCount();
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final result = await ApiService.getUnreadNotificationsCount();
+      if (result['success'] == true && mounted) {
+        setState(() {
+          _unreadCount = result['unread_count'] as int? ?? 0;
+        });
+      }
+    } catch (e) {
+      // Silently fail - notification count is not critical
+    }
+  }
+
+  Future<void> _loadChatUnreadCount() async {
+    try {
+      final result = await ApiService.getUnreadChatMessagesCount();
+      if (result['success'] == true && mounted) {
+        setState(() {
+          _chatUnreadCount = result['unread_count'] as int? ?? 0;
+        });
+      }
+    } catch (e) {
+      // Silently fail - chat unread count is not critical
     }
   }
 
@@ -93,13 +133,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     setState(() {
       _isLoading = true;
       _isLoadingRequests = true;
+      _isLoadingDonors = true;
       _errorMessage = null;
       _userProfile = null; // Clear previous profile
+      _respondingDonors = [];
     });
 
     try {
-      // Load profile and requests in parallel
-      final results = await Future.wait([
+      final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+
+      // Load profile and base data in parallel
+      final baseResults = await Future.wait([
         ApiService.getProfile(),
         ApiService.getBloodRequests(status: 'pending'),
       ]);
@@ -107,7 +151,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       if (mounted) {
         setState(() {
           // Process profile
-          final profileResult = results[0] as Map<String, dynamic>;
+          final profileResult = baseResults[0] as Map<String, dynamic>;
           if (profileResult['success'] == true) {
             final data = profileResult['data'];
             // Check if profile exists (for donors) or only user data (for patients)
@@ -128,9 +172,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           _isLoading = false;
 
           // Process blood requests
-          _requestsResponse = results[1] as BloodRequestListResponse;
+          _requestsResponse = baseResults[1] as BloodRequestListResponse;
           _isLoadingRequests = false;
         });
+
+        // Load responding donors if patient
+        if (roleProvider.isPatient) {
+          await _loadRespondingDonors();
+        } else {
+          setState(() {
+            _isLoadingDonors = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -138,7 +191,233 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           _errorMessage = e.toString();
           _isLoading = false;
           _isLoadingRequests = false;
+          _isLoadingDonors = false;
         });
+      }
+    }
+  }
+
+  Future<void> _loadRespondingDonors() async {
+    try {
+      final result = await ApiService.getRespondingDonorsForPatient();
+
+      if (result['success'] == true && mounted) {
+        final donors = result['donors'] as List? ?? [];
+        final summary = result['summary'] as Map<String, dynamic>? ?? {};
+
+        setState(() {
+          _respondingDonors = donors.map((d) => d as Map<String, dynamic>).toList();
+          _totalDonorsCount = summary['total_donors'] as int? ?? 0;
+          _isLoadingDonors = false;
+        });
+      } else {
+        setState(() {
+          _respondingDonors = [];
+          _totalDonorsCount = 0;
+          _isLoadingDonors = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _respondingDonors = [];
+          _totalDonorsCount = 0;
+          _isLoadingDonors = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _acceptPledge(Map<String, dynamic> donorData) async {
+    // Prevent double clicks
+    if (_isAcceptingPledge) {
+      return;
+    }
+
+    try {
+      // Debug: Print donorData structure
+      print('DEBUG: donorData = $donorData');
+
+      final donor = donorData['donor'] as Map<String, dynamic>;
+      final requestId = donorData['request_id'] as String;
+      final pledgeId = donorData['pledge_id'] as String;
+
+      print('DEBUG: requestId = $requestId');
+      print('DEBUG: pledgeId = $pledgeId');
+
+      if (requestId.isEmpty || pledgeId.isEmpty) {
+        throw Exception('Invalid request ID or pledge ID');
+      }
+
+      setState(() {
+        _isAcceptingPledge = true;
+      });
+
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('Accepting pledge...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Call the accept pledge API
+      final response = await ApiService.acceptPledge(
+        requestId: requestId,
+        pledgeId: pledgeId,
+      );
+
+      print('DEBUG: API response = $response');
+
+      if (mounted) {
+        if (response['success'] == true) {
+          // Refresh the responding donors list
+          await _loadRespondingDonors();
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pledge accepted! You can now chat with the donor.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Optionally open chat after accepting
+          // await _openChatWithDonor(donorData);
+        } else {
+          // Check if error is about already confirmed pledge
+          final message = response['message']?.toString() ?? 'Failed to accept pledge';
+          print('DEBUG: Error message = $message');
+
+          if (message.contains('Cannot accept pledge') || message.contains('already')) {
+            // Refresh to show current state
+            await _loadRespondingDonors();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('This pledge has already been accepted.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          } else {
+            // Show error message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('DEBUG: Exception = $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAcceptingPledge = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openChatWithDonor(Map<String, dynamic> donorData) async {
+    try {
+      final donor = donorData['donor'] as Map<String, dynamic>;
+      final pledge = donorData['pledge'] as Map<String, dynamic>;
+      final requestId = donorData['request_id'] as String;
+      final donorId = donor['id'] as String;
+      final donorName = donor['name'] as String? ?? 'Donor';
+      final patientName = donorData['patient_name'] as String? ?? 'Patient';
+
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('Opening chat...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Get current user ID
+      final profile = await ApiService.getProfile();
+      if (profile['success'] != true) {
+        throw Exception('Failed to get user profile');
+      }
+
+      final patientId = profile['data']['user']?['id']?.toString();
+      if (patientId == null) {
+        throw Exception('User ID not found');
+      }
+
+      // Initialize Firebase chat service
+      await FirebaseChatService.initialize();
+
+      // Get or create conversation
+      final conversation = await FirebaseChatService.instance.getOrCreateConversation(
+        requestId: requestId,
+        patientId: patientId,
+        patientName: patientName,
+        donorId: donorId,
+        donorName: donorName,
+      );
+
+      if (mounted) {
+        // Navigate to chat
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatConversationScreen(
+              conversation: conversation,
+              currentUserId: patientId,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open chat: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -246,8 +525,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           _buildPatientQuickActions(),
           const SizedBox(height: 20),
 
-          // Active Blood Requests Section
-          _buildActiveRequestsSection(),
+          // Responding Donors Section (NEW)
+          _buildRespondingDonorsSection(),
           const SizedBox(height: 80), // Bottom nav spacing
         ],
       ),
@@ -305,13 +584,70 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final userName = _userProfile?.userFullName ?? 'Guest';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Text(
-        'Hi, $userName 👋',
-        style: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: AppColors.textPrimary,
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Hi, $userName 👋',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          // Notification Bell with badge
+          GestureDetector(
+            onTap: () async {
+              await Navigator.pushNamed(context, AppRoutes.notifications);
+              // Refresh unread count when returning
+              _loadUnreadCount();
+              _loadChatUnreadCount();
+            },
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary,
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Icon(
+                    Icons.notifications_outlined,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                  if (_unreadCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.yellow,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          _unreadCount > 9 ? '9+' : _unreadCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -466,7 +802,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
           // Notification Bell
           GestureDetector(
-            onTap: () => Navigator.pushNamed(context, AppRoutes.notifications),
+            onTap: () async {
+              await Navigator.pushNamed(context, AppRoutes.notifications);
+              // Refresh unread count when returning
+              _loadUnreadCount();
+              _loadChatUnreadCount();
+            },
             child: Container(
               width: 48,
               height: 48,
@@ -474,10 +815,40 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 shape: BoxShape.circle,
                 color: AppColors.primary,
               ),
-              child: const Icon(
-                Icons.notifications_outlined,
-                color: Colors.white,
-                size: 22,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  const Icon(
+                    Icons.notifications_outlined,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                  if (_unreadCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.yellow,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          _unreadCount > 9 ? '9+' : _unreadCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -564,8 +935,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   /// Active Blood Requests Section
   Widget _buildActiveRequestsSection() {
+    // For patients, show only their own requests
+    // For donors, show all active requests
+    final roleProvider = Provider.of<RoleProvider>(context, listen: false);
+
     final activeRequests = _requestsResponse?.bloodRequests
-            .where((r) => r.isActive && r.status == 'pending')
+            .where((r) {
+              // Filter by active and pending status
+              if (!r.isActive || r.status != 'pending') return false;
+
+              // If patient, only show their own requests
+              if (roleProvider.isPatient) {
+                return r.requestedById == _userProfile?.id;
+              }
+
+              // Donors see all active requests
+              return true;
+            })
             .toList() ??
         [];
 
@@ -610,6 +996,445 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 child: _buildRequestCard(request),
               )),
       ],
+    );
+  }
+
+  /// Responding Donors Section (for patients)
+  Widget _buildRespondingDonorsSection() {
+    if (_isLoadingDonors) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section Header
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Responding Donors',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (_totalDonorsCount > 0)
+                    Text(
+                      '$_totalDonorsCount donor${_totalDonorsCount > 1 ? 's' : ''} responding',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                ],
+              ),
+              if (_totalDonorsCount > 0)
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.allRespondingDonors);
+                  },
+                  child: const Text('View all'),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Donor Cards or Empty State
+        if (_respondingDonors.isEmpty)
+          _buildEmptyDonorsCard()
+        else
+          ..._respondingDonors.take(5).map((donorData) => _buildDonorCard(donorData)),
+      ],
+    );
+  }
+
+  /// Empty donors card
+  Widget _buildEmptyDonorsCard() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.people_outline,
+              size: 48,
+              color: AppColors.textSecondary.withOpacity(0.5),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'No responding donors yet',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Donors who respond to your requests will appear here',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Donor card for responding donors section
+  Widget _buildDonorCard(Map<String, dynamic> donorData) {
+    final donor = donorData['donor'] as Map<String, dynamic>;
+    final pledge = donorData['pledge'] as Map<String, dynamic>;
+
+    // Get status color and icon
+    Color statusColor;
+    IconData statusIcon;
+    String statusLabel = pledge['status_display'] as String? ?? 'Unknown';
+
+    switch (pledge['status'] as String? ?? '') {
+      case 'pledged':
+        statusColor = Colors.orange;
+        statusIcon = Icons.volunteer_activism;
+        break;
+      case 'confirmed':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        break;
+      case 'on_the_way':
+        statusColor = Colors.blue;
+        statusIcon = Icons.directions_walk;
+        break;
+      case 'arrived':
+      case 'ready':
+        statusColor = Colors.purple;
+        statusIcon = Icons.location_on;
+        break;
+      case 'completed':
+        statusColor = AppColors.primary;
+        statusIcon = Icons.favorite;
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.help_outline;
+    }
+
+    // Parse preferred date and time from note
+    final note = pledge['note'] as String? ?? '';
+    String? preferredDateTime;
+    String displayNote = note;
+
+    // Try to match "Preferred time: HH:MM AM/PM" (12-hour format) first
+    final timeMatch12 = RegExp(r'Preferred time: (\d{1,2}:\d{2} [AP]M)', caseSensitive: false).firstMatch(note);
+    if (timeMatch12 != null) {
+      preferredDateTime = timeMatch12.group(1);
+      // Remove the time line from the note for cleaner display
+      displayNote = note.replaceAll(RegExp(r'Preferred time: \d{1,2}:\d{2} [AP]M', caseSensitive: false), '').trim();
+    } else {
+      // Fallback to 24-hour format "Preferred time: HH:MM" (for older pledges)
+      final timeMatch24 = RegExp(r'Preferred time: (\d{2}:\d{2})').firstMatch(note);
+      if (timeMatch24 != null) {
+        final timeStr = timeMatch24.group(1)!;
+        // Convert 24-hour format to 12-hour format with AM/PM
+        final parts = timeStr.split(':');
+        final hour = int.parse(parts[0]);
+        final minute = parts[1];
+        final period = hour < 12 ? 'AM' : 'PM';
+        final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+        preferredDateTime = '${displayHour.toString().padLeft(2, '0')}:$minute $period';
+
+        // Remove the time line from the note for cleaner display
+        displayNote = note.replaceAll(RegExp(r'Preferred time: \d{2}:\d{2}'), '').trim();
+      }
+    }
+
+    // Clean up any double newlines left after removing time
+    if (displayNote.startsWith('\n\n')) {
+      displayNote = displayNote.substring(2);
+    }
+    if (displayNote.endsWith('\n\n')) {
+      displayNote = displayNote.substring(0, displayNote.length - 2);
+    }
+
+    // Format preferred date if available
+    String formattedDate = '';
+    if (pledge['preferred_date'] != null) {
+      try {
+        final dateStr = pledge['preferred_date'] as String;
+        final date = DateTime.parse(dateStr);
+        formattedDate = '${date.day}/${date.month}/${date.year}';
+        if (preferredDateTime != null) {
+          formattedDate += ' at $preferredDateTime';
+        }
+      } catch (e) {
+        formattedDate = pledge['preferred_date'] as String? ?? '';
+      }
+    } else if (preferredDateTime != null) {
+      formattedDate = preferredDateTime;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: pledge['status'] == 'confirmed'
+                ? Colors.green.withOpacity(0.3)
+                : AppColors.border,
+            width: pledge['status'] == 'confirmed' ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Donor info row
+            Row(
+              children: [
+                // Blood group badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    donor['blood_group'] as String? ?? '--',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Donor name
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        donor['name'] as String? ?? 'Unknown Donor',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (donor['city'] != null)
+                        Text(
+                          donor['city'] as String? ?? '',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(statusIcon, size: 14, color: statusColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        statusLabel,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Preferred date/time row
+            if (formattedDate.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.schedule,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Preferred: $formattedDate',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            if (formattedDate.isNotEmpty && displayNote.isNotEmpty)
+              const SizedBox(height: 8),
+
+            // Pledge note (excluding time)
+            if (displayNote.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.softPink.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  displayNote,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textPrimary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+
+            const SizedBox(height: 12),
+
+            // Action buttons - wrap to two rows if needed
+            if (pledge['can_accept'] as bool? ?? false)
+              // Show accept button prominently on its own row when available
+              Column(
+                children: [
+                  // Accept button (full width)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _acceptPledge(donorData),
+                      icon: const Icon(Icons.check, size: 18),
+                      label: const Text('Accept Pledge'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Secondary actions (Call and Chat)
+                  Row(
+                    children: [
+                      // Call button
+                      if (donor['phone'] != null)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              // TODO: Implement call functionality
+                            },
+                            icon: const Icon(Icons.call, size: 16),
+                            label: const Text('Call'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: BorderSide(color: AppColors.primary),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                      if (donor['phone'] != null) const SizedBox(width: 8),
+                      // Chat button
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _openChatWithDonor(donorData),
+                          icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                          label: const Text('Chat'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            else
+              // Show Call and Chat buttons in one row when accept is not available
+              Row(
+                children: [
+                  // Call button
+                  if (donor['phone'] != null)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          // TODO: Implement call functionality
+                        },
+                        icon: const Icon(Icons.call, size: 16),
+                        label: const Text('Call'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  if (donor['phone'] != null) const SizedBox(width: 8),
+                  // Chat button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openChatWithDonor(donorData),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                      label: const Text('Chat'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -829,7 +1654,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
           // Notification Bell
           GestureDetector(
-            onTap: () => Navigator.pushNamed(context, AppRoutes.notifications),
+            onTap: () async {
+              await Navigator.pushNamed(context, AppRoutes.notifications);
+              // Refresh unread count when returning
+              _loadUnreadCount();
+              _loadChatUnreadCount();
+            },
             child: Container(
               width: 48,
               height: 48,
@@ -845,18 +1675,31 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     color: AppColors.primary,
                     size: 22,
                   ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
+                  if (_unreadCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.yellow,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          _unreadCount > 9 ? '9+' : _unreadCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -1217,6 +2060,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     return UnifiedBottomNavigationBar(
       selectedIndex: getCurrentIndex(),
+      chatUnreadCount: _chatUnreadCount,
       onItemTapped: (index) {
         // Handle navigation taps explicitly
         switch (index) {

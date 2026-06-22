@@ -30,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Blood requests data
   BloodRequestListResponse? _requestsResponse;
 
+  // Notifications
+  int _unreadCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -78,10 +81,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _requestsResponse = null; // Clear previous requests
     });
 
-    // Load profile and requests in parallel
+    // Load profile, requests, and unread count in parallel
     final results = await Future.wait([
       ApiService.getProfile(),
       ApiService.getBloodRequests(status: 'pending'),
+      _loadUnreadCount(),
     ]);
 
     if (mounted) {
@@ -100,6 +104,24 @@ class _HomeScreenState extends State<HomeScreen> {
         _requestsResponse = results[1] as BloodRequestListResponse;
         _isLoadingRequests = false;
       });
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final result = await ApiService.getUnreadNotificationsCount();
+      if (result['success'] == true && mounted) {
+        setState(() {
+          _unreadCount = result['unread_count'] as int? ?? 0;
+        });
+      }
+    } catch (e) {
+      // Silently fail - notification count is not critical
+      if (mounted) {
+        setState(() {
+          _unreadCount = 0;
+        });
+      }
     }
   }
 
@@ -269,36 +291,76 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Notification Bell
           GestureDetector(
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.notifications);
+            onTap: () async {
+              await Navigator.pushNamed(context, AppRoutes.notifications);
+              // Reload unread count when returning
+              _loadUnreadCount();
             },
-            child: Container(
+            child: SizedBox(
               width: 44,
               height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.softPink.withValues(alpha: 0.5),
-              ),
               child: Stack(
-                alignment: Alignment.center,
+                clipBehavior: Clip.none,
                 children: [
-                  const Icon(
-                    Icons.notifications_outlined,
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.softPink.withValues(alpha: 0.3),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2), width: 1),
+                    ),
+                    child: Icon(
+                      _unreadCount > 0 ? Icons.notifications : Icons.notifications_outlined,
+                      color: AppColors.primary,
+                      size: 22,
                     ),
                   ),
+                  if (_unreadCount > 0)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD62828), // Red for urgency
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        child: Text(
+                          _unreadCount > 99 ? '99+' : '$_unreadCount',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            height: 1.0,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  else
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
                 ],
               ),
             ),

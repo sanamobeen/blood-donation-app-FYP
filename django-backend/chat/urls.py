@@ -21,4 +21,7 @@ urlpatterns = [
 
     # Block management
     path('unblock/', views.unblock_user, name='unblock_user'),
+
+    # Unread count endpoint
+    path('unread-count/', views.unread_count, name='unread_count'),
 ]

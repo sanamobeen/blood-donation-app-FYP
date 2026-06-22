@@ -12,6 +12,7 @@ from django.db.models import Q
 import datetime
 import logging
 
+from account.models import CustomUser
 from .models import Conversation, Message, BlockedUser
 from .serializers import (
     MessageSerializer,
@@ -269,16 +270,22 @@ def send_message(request, conversation_id):
         # Only notify if not too frequent (every 5th message or first in a while)
         if recent_messages % 5 == 0:
             try:
-                from notifications.models import Notification
-                Notification.objects.create(
+                from notifications.views import send_push_notification
+                send_push_notification(
                     user=recipient,
                     title='New Message',
                     message=f'{request.user.full_name or request.user.email} sent you a message.',
-                    type='new_message',
-                    related_conversation_id=str(conversation.id)
+                    notif_type='new_message',
+                    data={
+                        'conversation_id': str(conversation.id),
+                        'sender_id': str(request.user.id),
+                        'sender_name': request.user.full_name or request.user.email,
+                    },
+                    send_push=True  # Enable FCM push notification
                 )
+                logger.info(f"Push notification sent to {recipient.email} for new message")
             except Exception as e:
-                logger.warning(f"Failed to create notification: {e}")
+                logger.warning(f"Failed to send push notification: {e}")
 
         logger.info(f"Message sent in conversation {conversation_id} by {request.user.email}")
 
@@ -414,3 +421,46 @@ def unblock_user(request):
     except Exception as e:
         logger.error(f"Error unblocking user: {str(e)}", exc_info=True)
         return error_response('Failed to unblock user.', status_code=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def unread_count(request):
+    """
+    Get total unread message count for the current user.
+
+    GET /api/chat/unread-count/
+
+    Response (200 OK):
+    {
+        "success": true,
+        "unread_count": 5
+    }
+    """
+    try:
+        # Get all conversations where user is a participant
+        conversations = Conversation.objects.filter(
+            is_active=True
+        ).filter(
+            Q(patient=request.user) | Q(donor=request.user)
+        )
+
+        # Count unread messages (excluding messages sent by the user)
+        total_unread = 0
+        for conversation in conversations:
+            total_unread += conversation.messages.filter(
+                is_read=False,
+                is_deleted=False
+            ).exclude(sender=request.user).count()
+
+        return success_response(
+            message='Unread count retrieved',
+            data={'unread_count': total_unread}
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting unread count: {str(e)}", exc_info=True)
+        return error_response(
+            message='Failed to get unread count.',
+            status_code=500
+        )
