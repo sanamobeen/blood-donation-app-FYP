@@ -14,6 +14,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 from decouple import config, config as env
+import dotenv
+
+# Load environment variables from .env file
+dotenv.load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -222,7 +226,8 @@ TWILIO_AUTH_TOKEN = env('TWILIO_AUTH_TOKEN', default='')
 TWILIO_PHONE_NUMBER = env('TWILIO_PHONE_NUMBER', default='')
 
 # Firebase Configuration (optional)
-FIREBASE_CREDENTIALS_PATH = env('FIREBASE_CREDENTIALS_PATH', default='')
+_firebase_path = env('FIREBASE_CREDENTIALS_PATH', default='')
+FIREBASE_CREDENTIALS_PATH = str(BASE_DIR / _firebase_path) if _firebase_path and not _firebase_path.startswith('/') else _firebase_path
 
 # Firebase Admin SDK Configuration for Push Notifications
 # Path to Firebase service account JSON file
@@ -363,3 +368,40 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': 86400.0,  # Run daily (24 hours)
     },
 }
+
+
+# ===============================
+# LLM Configuration for AI Chatbot
+# ===============================
+
+# Enable/disable LLM service (fallback to TF-IDF if disabled)
+LLM_ENABLED = os.environ.get('LLM_ENABLED', 'true').lower() != 'false'
+
+# OpenRouter API configuration
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
+OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'openrouter/free')
+LLM_TEMPERATURE = os.environ.get('LLM_TEMPERATURE', '0.7')
+LLM_MAX_TOKENS = os.environ.get('LLM_MAX_TOKENS', '500')
+
+# ===============================
+# Firebase Initialization
+# ===============================
+
+# Initialize Firebase Admin SDK for FCM
+try:
+    from firebase_admin import credentials, initialize_app
+    import firebase_admin
+
+    # Check if already initialized
+    if not firebase_admin._apps:
+        # Get Firebase credentials path
+        firebase_credentials_path = os.environ.get('FIREBASE_CREDENTIALS_PATH')
+
+        if firebase_credentials_path and os.path.exists(firebase_credentials_path):
+            cred = credentials.Certificate(firebase_credentials_path)
+            initialize_app(cred, options={'project_id': 'blood-donation-chat'})
+            print("Firebase Admin SDK initialized successfully")
+        else:
+            print("Firebase credentials not found - FCM notifications will not work")
+except Exception as e:
+    print(f"Failed to initialize Firebase: {e}")

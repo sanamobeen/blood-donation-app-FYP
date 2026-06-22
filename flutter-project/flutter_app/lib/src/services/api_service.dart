@@ -1869,6 +1869,30 @@ class ApiService {
     }
   }
 
+  /// Get unread notifications count
+  static Future<Map<String, dynamic>> getUnreadNotificationsCount() async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.notificationsEndpoint}/unread-count/'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'success': true,
+          'unread_count': data['unread_count'] as int? ?? 0
+        };
+      } else {
+        return {'success': false, 'message': 'Failed to get unread count'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
   /// Mark notification as read
   static Future<Map<String, dynamic>> markNotificationAsRead(String notificationId) async {
     try {
@@ -2444,24 +2468,45 @@ class ApiService {
     String? patientNote,
   }) async {
     try {
+      print('DEBUG acceptPledge: requestId=$requestId, pledgeId=$pledgeId');
 
       final headers = await getAuthHeaders();
+      print('DEBUG acceptPledge: Headers=$headers');
+
+      final url = '${ApiConfig.bloodRequestsEndpoint}/$requestId/pledges/$pledgeId/accept/';
+      print('DEBUG acceptPledge: URL=$url');
+
       final response = await http.post(
-        Uri.parse('${ApiConfig.bloodRequestsEndpoint}/$requestId/pledges/$pledgeId/accept/'),
+        Uri.parse(url),
         headers: headers,
         body: jsonEncode({
           if (patientNote != null) 'patient_note': patientNote,
         }),
       );
 
-      final data = jsonDecode(response.body);
+      print('DEBUG acceptPledge: Status code=${response.statusCode}');
+      print('DEBUG acceptPledge: Response body=${response.body}');
+
+      // Try to parse as JSON, but handle non-JSON responses
+      dynamic data;
+      try {
+        data = jsonDecode(response.body);
+      } catch (jsonError) {
+        print('DEBUG acceptPledge: JSON parse error: $jsonError');
+        print('DEBUG acceptPledge: Response is not valid JSON');
+        return {
+          'success': false,
+          'message': 'Server returned non-JSON response. Status: ${response.statusCode}. Body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}'
+        };
+      }
 
       if (response.statusCode == 200) {
         return {'success': true, 'data': data};
       } else {
-        return {'success': false, 'message': data['message'] ?? 'Failed to accept pledge'};
+        return {'success': false, 'message': data['message']?.toString() ?? data['detail']?.toString() ?? 'Failed to accept pledge'};
       }
     } catch (e) {
+      print('DEBUG acceptPledge: Exception=$e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -2618,6 +2663,37 @@ class ApiService {
     }
   }
 
+  /// Get all responding donors for patient's blood requests
+  static Future<Map<String, dynamic>> getRespondingDonorsForPatient() async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.bloodRequestsEndpoint}/responding-donors/'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data;
+      } else {
+        return {
+          'success': false,
+          'message': 'Failed to fetch responding donors',
+          'donors': [],
+          'summary': {'total_donors': 0},
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error: $e',
+        'donors': [],
+        'summary': {'total_donors': 0},
+      };
+    }
+  }
+
   // ===== PROFILE EDIT API =====
 
   /// Upload profile picture
@@ -2727,6 +2803,30 @@ class ApiService {
         return {'success': true, 'data': data};
       } else {
         return {'success': false, 'message': data['message'] ?? 'Failed to update profile', 'errors': data['errors']};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Get unread chat messages count
+  static Future<Map<String, dynamic>> getUnreadChatMessagesCount() async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.chatEndpoint}/unread-count/'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'success': true,
+          'unread_count': data['data']['unread_count'] as int? ?? 0
+        };
+      } else {
+        return {'success': false, 'message': 'Failed to get unread chat count'};
       }
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};

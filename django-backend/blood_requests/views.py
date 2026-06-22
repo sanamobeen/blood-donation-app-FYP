@@ -737,6 +737,18 @@ def create_pledge(request, request_id):
                 errors=pledge_serializer.errors
             )
 
+        # Ensure donor has a profile (create if missing)
+        from account.models import UserProfile
+        donor_profile, created = UserProfile.objects.get_or_create(
+            user=request.user,
+            defaults={
+                'blood_group': blood_request.blood_group,  # Set blood group from request
+                'city': 'Unknown',  # Default value
+            }
+        )
+        if created:
+            logger.info(f"✅ Created donor profile for {request.user.email}")
+
         # Create pledge with PLEDGED status
         pledge = DonorResponse.objects.create(
             blood_request=blood_request,
@@ -753,6 +765,25 @@ def create_pledge(request, request_id):
         blood_request.responders_count += 1
         blood_request.save()
         logger.info(f"✅ Blood request updated: units_pledged={blood_request.units_pledged}, responders={blood_request.responders_count}")
+
+        # Create notification for the patient
+        if blood_request.requested_by:
+            try:
+                from notifications.views import send_push_notification
+                send_push_notification(
+                    user=blood_request.requested_by,
+                    title='New Pledge Received! 🩸',
+                    message=f'{request.user.full_name or request.user.email} has pledged to donate {blood_request.blood_group} blood for {blood_request.patient_name}.',
+                    notif_type='new_pledge',
+                    data={
+                        'request_id': str(blood_request.id),
+                        'pledge_id': str(pledge.id),
+                    },
+                    send_push=True
+                )
+                logger.info(f"✅ Notification sent to patient: {blood_request.requested_by.email}")
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to send notification: {str(e)}")
 
         logger.info(f"🎉 Pledge creation SUCCESS")
         return success_response(
@@ -1306,8 +1337,6 @@ def get_pledged_donors_for_patient(request, request_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
 def accept_pledge(request, request_id, pledge_id):
     """
     Accept a donor's pledge as PRIMARY donor (patient only).
@@ -1333,53 +1362,73 @@ def accept_pledge(request, request_id, pledge_id):
         from django.db import transaction
         from django.utils import timezone
 
+        logger.info(f"accept_pledge START: request_id={request_id}, pledge_id={pledge_id}, user={request.user.email}")
+
         with transaction.atomic():
+            logger.info("Step 1: Getting blood_request and pledge")
             blood_request = BloodRequest.objects.select_for_update().get(id=request_id)
             pledge = DonorResponse.objects.get(id=pledge_id, blood_request=blood_request)
+            logger.info(f"Step 1 DONE: blood_request={blood_request.id}, pledge status={pledge.status}")
 
             # Verify user is the request creator
+            logger.info("Step 2: Checking authorization")
             if blood_request.requested_by != request.user:
+                logger.warning(f"Authorization failed: {blood_request.requested_by.email} != {request.user.email}")
                 return error_response(
                     message='You are not authorized to accept pledges for this request.',
                     status_code=status.HTTP_403_FORBIDDEN
                 )
+            logger.info("Step 2 DONE: Authorized")
 
             # Check if there's already an active donor
+            logger.info("Step 3: Checking for active donor")
             if blood_request.active_donor_pledge_id:
+                logger.warning(f"Active donor already exists: {blood_request.active_donor_pledge_id}")
                 return error_response(
                     'This request already has an active donor.',
                     status_code=status.HTTP_409_CONFLICT
                 )
+            logger.info("Step 3 DONE: No active donor")
 
             # Check if pledge can be accepted
+            logger.info("Step 4: Checking pledge status")
             if pledge.status != 'pledged':
+                logger.warning(f"Pledge status is not pledged: {pledge.status}")
                 return error_response(
                     message=f'Cannot accept pledge with status "{pledge.status}".',
                     status_code=status.HTTP_400_BAD_REQUEST
                 )
+            logger.info("Step 4 DONE: Pledge status is pledged")
 
             # Get patient note
+            logger.info("Step 5: Getting patient note")
             serializer = AcceptPledgeSerializer(data=request.data)
             if serializer.is_valid():
                 patient_note = serializer.validated_data.get('patient_note', '')
+                logger.info(f"Step 5 DONE: Patient note={patient_note}")
             else:
+                logger.error(f"Step 5 FAILED: Serializer errors={serializer.errors}")
                 return error_response(
                     message='Invalid data.',
                     errors=serializer.errors
                 )
 
             # Update pledge to CONFIRMED status
+            logger.info("Step 6: Updating pledge to confirmed")
             pledge.status = 'confirmed'
             pledge.confirmed_at = timezone.now()
             pledge.patient_note = patient_note
             pledge.save()
+            logger.info("Step 6 DONE: Pledge updated")
 
             # Set as active donor on blood request
+            logger.info("Step 7: Setting active donor on blood request")
             blood_request.active_donor_pledge_id = pledge.id
             blood_request.responders_count = F('responders_count') + 1
             blood_request.save(update_fields=['active_donor_pledge_id', 'responders_count'])
+            logger.info("Step 7 DONE: Blood request updated")
 
-            logger.info(f"Pledge {pledge_id} confirmed by {request.user.email}")
+            logger.info(f"SUCCESS: Pledge {pledge_id} confirmed by {request.user.email}")
 
             # AUTO-CREATE OR UPDATE CONVERSATION
             try:
@@ -2629,5 +2678,133 @@ def verify_pledge(request, pledge_id):
         logger.error(f"Error verifying pledge: {str(e)}", exc_info=True)
         return error_response(
             message='Failed to verify pledge.',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_responding_donors_for_patient(request):
+    """
+    Get all donors who have responded to the patient's blood requests.
+
+    GET /api/blood-requests/responding-donors/
+
+    Response (200 OK):
+    {
+        "success": true,
+        "message": "Responding donors retrieved",
+        "donors": [...],
+        "summary": {
+            "total_donors": 5,
+            "pledged": 3,
+            "confirmed": 2
+        }
+    }
+    """
+    try:
+        from django.db.models import Q, F
+        from account.models import CustomUser
+
+        # Get all blood requests created by this patient
+        patient_requests = BloodRequest.objects.filter(
+            requested_by=request.user
+        ).values_list('id', flat=True)
+
+        if not patient_requests:
+            return success_response(
+                message='No blood requests found',
+                data={
+                    'donors': [],
+                    'summary': {
+                        'total_donors': 0,
+                        'pledged': 0,
+                        'confirmed': 0,
+                        'on_the_way': 0,
+                        'completed': 0
+                    }
+                }
+            )
+
+        # Get all pledges for the patient's requests
+        pledges = DonorResponse.objects.filter(
+            blood_request_id__in=patient_requests
+        ).select_related('donor__profile', 'blood_request').order_by('-created_at')
+
+        # Serialize pledges with donor details
+        donor_data = []
+        pledged_count = 0
+        confirmed_count = 0
+        on_the_way_count = 0
+        completed_count = 0
+
+        for pledge in pledges:
+            # Skip cancelled or rejected pledges
+            if pledge.status in ['cancelled', 'rejected']:
+                continue
+
+            donor = pledge.donor
+            if not donor:
+                continue
+
+            # Count by status
+            if pledge.status == 'pledged':
+                pledged_count += 1
+            elif pledge.status == 'confirmed':
+                confirmed_count += 1
+            elif pledge.status == 'on_the_way':
+                on_the_way_count += 1
+            elif pledge.status == 'completed':
+                completed_count += 1
+
+            # Get donor profile data
+            profile = getattr(donor, 'profile', None)
+
+            donor_info = {
+                'pledge_id': str(pledge.id),
+                'request_id': str(pledge.blood_request.id),
+                'patient_name': pledge.blood_request.patient_name,
+                'blood_group': pledge.blood_request.blood_group,
+                'donor': {
+                    'id': str(donor.id),
+                    'name': donor.full_name or donor.email.split('@')[0],
+                    'email': donor.email,
+                    'phone': donor.phone_num if donor else None,
+                    'blood_group': profile.blood_group if profile else None,
+                    'city': profile.city if profile else None,
+                },
+                'pledge': {
+                    'units_pledged': pledge.units_pledged,
+                    'preferred_date': pledge.preferred_date.isoformat() if pledge.preferred_date else None,
+                    'note': pledge.note,
+                    'status': pledge.status,
+                    'status_display': pledge.get_status_display(),
+                    'created_at': pledge.created_at.isoformat(),
+                    'is_confirmed': pledge.status == 'confirmed',
+                    'can_accept': pledge.status in ['pledged', 'shortlisted'],
+                    'can_reject': pledge.status in ['pledged', 'shortlisted', 'confirmed'],
+                    'can_complete': pledge.status in ['arrived', 'ready'],
+                }
+            }
+            donor_data.append(donor_info)
+
+        return success_response(
+            message='Responding donors retrieved',
+            data={
+                'donors': donor_data,
+                'summary': {
+                    'total_donors': len(donor_data),
+                    'pledged': pledged_count,
+                    'confirmed': confirmed_count,
+                    'on_the_way': on_the_way_count,
+                    'completed': completed_count
+                }
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching responding donors: {str(e)}", exc_info=True)
+        return error_response(
+            message='Failed to fetch responding donors.',
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

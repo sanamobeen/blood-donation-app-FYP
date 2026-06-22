@@ -6,7 +6,9 @@ Handles sending push notifications to mobile devices for SOS alerts and other fe
 import logging
 import json
 from typing import List, Dict, Any, Optional
+import firebase_admin
 from firebase_admin import messaging, credentials
+from firebase_admin import exceptions
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
@@ -28,10 +30,14 @@ def get_fcm_app():
     if _fcm_app is None:
         try:
             # Check if Firebase credentials are configured
-            if hasattr(settings, 'FIREBASE_CREDENTIALS'):
+            cred = None
+
+            # Check for FIREBASE_CREDENTIALS (dict) first
+            if hasattr(settings, 'FIREBASE_CREDENTIALS') and settings.FIREBASE_CREDENTIALS:
                 # From dictionary
                 cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
-            elif hasattr(settings, 'FIREBASE_CREDENTIALS_PATH'):
+            # Check for FIREBASE_CREDENTIALS_PATH (file path)
+            elif hasattr(settings, 'FIREBASE_CREDENTIALS_PATH') and settings.FIREBASE_CREDENTIALS_PATH:
                 # From file path
                 cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
             else:
@@ -42,10 +48,10 @@ def get_fcm_app():
                 cred = None
 
             if cred:
-                _fcm_app = messaging.initialize_app(cred, app=getattr(settings, 'FIREBASE_PROJECT_ID', None))
+                _fcm_app = firebase_admin.initialize_app(cred, options={'project_id': getattr(settings, 'FIREBASE_PROJECT_ID', None)})
             else:
                 # Initialize without credentials (for development only)
-                _fcm_app = messaging.initialize_app()
+                _fcm_app = firebase_admin.initialize_app()
 
         except Exception as e:
             logger.error(f"Failed to initialize Firebase FCM: {str(e)}")
@@ -102,7 +108,7 @@ def send_to_device(
         logger.info(f"Successfully sent message to token {registration_token[:20]}...")
         return True
 
-    except messaging.InvalidArgumentError as e:
+    except exceptions.InvalidArgumentError as e:
         logger.error(f"Invalid FCM token: {str(e)}")
         return False
     except Exception as e:

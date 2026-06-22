@@ -314,3 +314,279 @@ def test_notification(request):
             message='Failed to send test notification.',
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+# ================================
+# Notification List & Management
+# ================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_notifications(request):
+    """
+    Get all notifications for the current user.
+
+    GET /api/notifications/
+
+    Query params:
+        unread_only=true - Get only unread notifications
+        limit=20 - Limit number of results
+
+    Response (200 OK):
+        {
+            "success": true,
+            "count": 15,
+            "results": [...]
+        }
+    """
+    try:
+        from .models import Notification
+
+        notifications = Notification.objects.filter(user=request.user)
+
+        # Filter by unread if requested
+        unread_only = request.query_params.get('unread_only', '').lower() == 'true'
+        if unread_only:
+            notifications = notifications.filter(is_read=False)
+
+        # Order by most recent
+        notifications = notifications.order_by('-created_at')
+
+        # Apply limit
+        limit = int(request.query_params.get('limit', 50))
+        notifications = notifications[:limit]
+
+        # Get unread count
+        unread_count = Notification.objects.filter(
+            user=request.user,
+            is_read=False
+        ).count()
+
+        # Serialize
+        results = []
+        for notif in notifications:
+            results.append({
+                'id': str(notif.id),
+                'title': notif.title,
+                'message': notif.message,
+                'type': notif.type,
+                'is_read': notif.is_read,
+                'read_at': notif.read_at.isoformat() if notif.read_at else None,
+                'created_at': notif.created_at.isoformat(),
+                'related_request_id': str(notif.related_request_id) if notif.related_request_id else None,
+                'related_pledge_id': str(notif.related_pledge_id) if notif.related_pledge_id else None,
+                'related_conversation_id': str(notif.related_conversation_id) if notif.related_conversation_id else None,
+            })
+
+        return success_response(
+            message=f'Found {len(results)} notification(s).',
+            data={
+                'notifications': results,
+                'unread_count': unread_count
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error listing notifications: {str(e)}", exc_info=True)
+        return error_response(
+            message='Failed to retrieve notifications.',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def unread_count(request):
+    """
+    Get unread notifications count.
+
+    GET /api/notifications/unread-count/
+
+    Response (200 OK):
+        {
+            "success": true,
+            "unread_count": 5
+        }
+    """
+    try:
+        from .models import Notification
+
+        count = Notification.objects.filter(
+            user=request.user,
+            is_read=False
+        ).count()
+
+        return success_response(
+            message='Unread count retrieved',
+            data={'unread_count': count}
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting unread count: {str(e)}", exc_info=True)
+        return error_response(
+            message='Failed to get unread count.',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_notification_read(request, notification_id):
+    """
+    Mark a notification as read.
+
+    POST /api/notifications/{id}/mark-read/
+
+    Response (200 OK):
+        {
+            "success": true,
+            "message": "Notification marked as read"
+        }
+    """
+    try:
+        from .models import Notification
+        from django.utils import timezone
+
+        try:
+            notification = Notification.objects.get(
+                id=notification_id,
+                user=request.user
+            )
+            notification.is_read = True
+            notification.read_at = timezone.now()
+            notification.save()
+
+            return success_response(message='Notification marked as read.')
+        except Notification.DoesNotExist:
+            return error_response(
+                message='Notification not found.',
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+    except Exception as e:
+        logger.error(f"Error marking notification as read: {str(e)}", exc_info=True)
+        return error_response(
+            message='Failed to mark notification as read.',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_all_read(request):
+    """
+    Mark all notifications as read for the current user.
+
+    POST /api/notifications/mark-all-read/
+
+    Response (200 OK):
+        {
+            "success": true,
+            "message": "Marked 15 notifications as read"
+        }
+    """
+    try:
+        from .models import Notification
+        from django.utils import timezone
+
+        count = Notification.objects.filter(
+            user=request.user,
+            is_read=False
+        ).update(
+            is_read=True,
+            read_at=timezone.now()
+        )
+
+        return success_response(message=f'Marked {count} notification(s) as read.')
+
+    except Exception as e:
+        logger.error(f"Error marking all as read: {str(e)}", exc_info=True)
+        return error_response(
+            message='Failed to mark all as read.',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+def send_push_notification(
+    user,
+    title: str,
+    message: str,
+    notif_type: str = 'general',
+    data=None,
+    send_push: bool = True
+):
+    """
+    Helper function to create and send a notification to a user.
+
+    Args:
+        user: CustomUser instance
+        title: Notification title
+        message: Notification message
+        notif_type: Type of notification (pledge, message, request_updated, etc.)
+        data: Optional dict with related IDs
+        send_push: Whether to send push notification
+
+    Returns:
+        Notification object
+    """
+    from .models import Notification
+
+    # Create notification record
+    notification = Notification.objects.create(
+        user=user,
+        title=title,
+        message=message,
+        type=notif_type,
+        related_request_id=data.get('request_id') if data else None,
+        related_pledge_id=data.get('pledge_id') if data else None,
+        related_conversation_id=data.get('conversation_id') if data else None,
+    )
+
+    # Send push notification if enabled
+    if send_push:
+        try:
+            # Get user's active FCM tokens from both DeviceToken and UserProfile
+            tokens = list(DeviceToken.objects.filter(
+                user=user,
+                is_active=True
+            ).values_list('token', flat=True))
+
+            # Also check UserProfile for fcm_token (legacy support)
+            try:
+                if hasattr(user, 'profile') and user.profile and user.profile.fcm_token:
+                    profile_token = user.profile.fcm_token
+                    if profile_token and profile_token not in tokens:
+                        tokens.append(profile_token)
+            except:
+                pass
+
+            if tokens:
+                from account.fcm_service import send_to_multicast
+
+                # Prepare notification data
+                push_data = {
+                    'type': notif_type,
+                    'notification_id': str(notification.id),
+                }
+                if data:
+                    push_data.update(data)
+
+                # Determine channel based on type
+                channel = 'sos_critical' if notif_type in ['sos_alert', 'pledge_accepted'] else 'sos_alerts'
+
+                # Send notification
+                send_to_multicast(
+                    registration_tokens=tokens,
+                    title=title,
+                    body=message,
+                    data=push_data,
+                    android_channel_id=channel,
+                    priority='high' if notif_type in ['sos_alert', 'pledge_accepted'] else 'normal',
+                )
+
+                logger.info(f"Sent push notification to {len(tokens)} device(s) for user {user.email}")
+
+        except Exception as e:
+            logger.error(f"Failed to send push notification: {str(e)}")
+
+    return notification

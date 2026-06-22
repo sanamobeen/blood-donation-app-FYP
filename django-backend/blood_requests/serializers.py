@@ -35,8 +35,17 @@ class BloodRequestSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
             'requested_by',  # Added to track who created the request
+            # Emergency/SOS fields
+            'broadcast_radius',
+            'emergency_donors_notified',
+            'emergency_donors_responded',
+            'emergency_expires_at',
+            'emergency_first_response_time',
+            'emergency_level',
+            'is_emergency',
+            'active_donor_pledge_id',
         ]
-        read_only_fields = ['id', 'status', 'expires_at', 'created_at', 'updated_at', 'requested_by']
+        read_only_fields = ['id', 'status', 'expires_at', 'created_at', 'updated_at', 'requested_by', 'broadcast_radius', 'emergency_donors_notified', 'emergency_donors_responded', 'emergency_expires_at', 'emergency_first_response_time', 'emergency_level', 'is_emergency', 'active_donor_pledge_id']
 
     def validate_patient_name(self, value):
         """Validate patient name is not empty."""
@@ -267,8 +276,8 @@ class DonorResponseSerializer(serializers.ModelSerializer):
 
     def get_donor_last_donation(self, obj):
         """Get donor last donation date safely."""
-        if obj.donor and hasattr(obj.donor, 'profile') and obj.donor.profile:
-            return obj.donor.profile.last_donation_date
+        # Note: UserProfile model doesn't have last_donation_date field
+        # This field is not currently tracked in the database
         return None
 
     class Meta:

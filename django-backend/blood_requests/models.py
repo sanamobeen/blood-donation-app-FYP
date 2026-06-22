@@ -119,6 +119,40 @@ class BloodRequest(models.Model):
         help_text="ID of the currently confirmed (active) donor pledge"
     )
 
+    # Emergency/SOS broadcast fields
+    broadcast_radius = models.IntegerField(
+        default=50,
+        help_text="Radius in km for broadcasting the request to nearby donors"
+    )
+    emergency_donors_notified = models.IntegerField(
+        default=0,
+        help_text="Number of donors notified for emergency requests"
+    )
+    emergency_donors_responded = models.IntegerField(
+        default=0,
+        help_text="Number of donors who responded to emergency requests"
+    )
+    emergency_expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When emergency request expires"
+    )
+    emergency_first_response_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Time of first donor response to emergency"
+    )
+    emergency_level = models.CharField(
+        max_length=20,
+        choices=URGENCY_CHOICES,
+        default='normal',
+        help_text="Emergency level for this request"
+    )
+    is_emergency = models.BooleanField(
+        default=False,
+        help_text="Whether this is marked as an emergency request"
+    )
+
     # User who created the request (optional - can be anonymous)
     requested_by = models.ForeignKey(
         CustomUser,
