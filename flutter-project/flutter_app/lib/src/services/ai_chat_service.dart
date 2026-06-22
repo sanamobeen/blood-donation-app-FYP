@@ -8,7 +8,7 @@ import 'api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// AI Chat Service
-/// Handles communication with the AI chatbot backend
+/// Handles communication with the AI chatbot backend using LLM
 class AIChatService {
   AIChatService._();
 
@@ -36,7 +36,6 @@ class AIChatService {
     _addMessage(typingMessage);
 
     try {
-      // Check if we have an API endpoint configured
       final response = await _sendToBackend(userMessage);
 
       // Remove typing indicator
@@ -58,14 +57,12 @@ class AIChatService {
     }
   }
 
-  /// Send message to backend API
+  /// Send message to backend API using LLM
   Future<String> _sendToBackend(String message) async {
     try {
-      // Get user role from shared preferences
       final prefs = await SharedPreferences.getInstance();
       final userRole = prefs.getString('user_role') ?? 'both';
 
-      // Use the Django backend AI assistant endpoint
       final token = await ApiService.getAccessToken();
 
       final headers = {
@@ -73,37 +70,34 @@ class AIChatService {
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
+      // Use LLM by default (use_llm=true)
       final response = await http.post(
         Uri.parse('${ApiConfig.assistantEndpoint}/chat/'),
         headers: headers,
         body: jsonEncode({
           'question': message,
           'role': userRole,
+          'use_llm': true,  // Always use LLM
         }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
-          // Return the answer from the backend response
           return data['answer'] as String? ??
                  'I received your message but couldn\'t generate a response.';
         } else {
-          // Backend returned success=false
           return data['message'] as String? ?? 'Unable to process your request.';
         }
       } else if (response.statusCode == 503) {
-        // Service unavailable
         return 'The chatbot service is currently unavailable. Please try again later.';
       } else {
-        // Other HTTP errors
         debugPrint('Backend API error. Status: ${response.statusCode}, Body: ${response.body}');
-        return 'Sorry, I encountered an error communicating with the server. Please check your connection and try again.';
+        return 'Sorry, I encountered an error communicating with the server.';
       }
     } catch (e) {
-      // Network or parsing errors
       debugPrint('Backend API error: $e');
-      return 'Sorry, I couldn\'t connect to the server. Please check your internet connection and try again.';
+      return 'Sorry, I couldn\'t connect to the server. Please check your internet connection.';
     }
   }
 

@@ -12,7 +12,7 @@ import 'screens/blood_request/blood_request_form_screen.dart';
 import 'screens/donations/my_donations_screen.dart';
 // import 'screens/home/home_screen.dart'; // Removed - using MainNavigationScreen instead
 import 'screens/messages/messages_screen.dart';
-import 'screens/notifications/notifications_screen.dart';
+import 'screens/notifications/notifications_screen_api.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/onboarding/onboarding_screen_2.dart';
 import 'screens/onboarding/onboarding_screen3.dart';
@@ -110,7 +110,7 @@ class AppRoutes {
     nearbyRequests: (context) => const NearbyRequestsScreen(),
     messages: (context) => const MessagesScreen(),
     chatList: (context) => const MessagesScreen(),
-    notifications: (context) => const NotificationsScreen(),
+    notifications: (context) => const NotificationsScreenApi(),
     myDonations: (context) => const MyDonationsScreen(),
     profile: (context) => const ProfileScreen(),
     editProfile: (context) => const EditProfileScreen(),
