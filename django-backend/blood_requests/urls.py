@@ -35,6 +35,9 @@ urlpatterns = [
     # Donor's pledges management
     path('my-pledges/', views.get_my_pledges, name='get_my_pledges'),
 
+    # Patient: Get all responding donors for their requests
+    path('responding-donors/', views.get_responding_donors_for_patient, name='get_responding_donors_for_patient'),
+
     # Phase 5: Donation status tracking
     path('pledges/<uuid:pledge_id>/status/', views.update_pledge_status, name='update_pledge_status'),
 

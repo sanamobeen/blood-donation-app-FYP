@@ -152,8 +152,8 @@ class _PledgeDialogState extends State<PledgeDialog> {
     // Format date as YYYY-MM-DD for API (backend uses DateField, not DateTime)
     final formattedDate = '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}';
 
-    // Note: Time is collected for user reference but backend only stores date
-    final formattedTime = '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}';
+    // Format time in 12-hour format with AM/PM for display in note
+    final formattedTime = _formatTime(_selectedTime!);
 
     // Include time in the note for the patient to see
     final noteWithTime = _noteController.text.trim().isEmpty

@@ -40,6 +40,11 @@ class ChatRequestSerializer(serializers.Serializer):
         required=False,
         help_text="Optional session ID for conversation tracking"
     )
+    use_llm = serializers.BooleanField(
+        required=False,
+        default=True,  # Default to LLM
+        help_text="Use LLM service instead of TF-IDF chatbot"
+    )
 
 
 class ChatResponseSerializer(serializers.Serializer):

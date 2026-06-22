@@ -11,11 +11,13 @@ import '../providers/role_provider.dart';
 class UnifiedBottomNavigationBar extends StatelessWidget {
   final int selectedIndex;
   final Function(int)? onItemTapped;
+  final int? chatUnreadCount;
 
   const UnifiedBottomNavigationBar({
     super.key,
     required this.selectedIndex,
     this.onItemTapped,
+    this.chatUnreadCount,
   });
 
   /// Get the route for the Requests tab based on user role
@@ -110,6 +112,10 @@ class UnifiedBottomNavigationBar extends StatelessWidget {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    // Check if this is the chat item and has unread count
+    final bool isChatItem = item.label == 'Chat';
+    final bool hasUnread = isChatItem && chatUnreadCount != null && chatUnreadCount! > 0;
+
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -117,10 +123,41 @@ class UnifiedBottomNavigationBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isSelected ? item.activeIcon : item.icon,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              size: 24,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  isSelected ? item.activeIcon : item.icon,
+                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  size: 24,
+                ),
+                if (hasUnread)
+                  Positioned(
+                    top: -6,
+                    right: -8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Text(
+                        chatUnreadCount! > 9 ? '9+' : chatUnreadCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
