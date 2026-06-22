@@ -8,8 +8,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
+from django.conf import settings
 import uuid
 import logging
+import json
 
 from .models import FAQ, ChatHistory, UserFeedback
 from .serializers import (
@@ -20,6 +22,7 @@ from .serializers import (
     FeedbackSerializer
 )
 from .chatbot_service import get_chatbot, reload_chatbot
+from .llm_service import get_llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +53,8 @@ def chat(request):
 
     Body: {
         "question": "Is blood donation safe?",
-        "session_id": "uuid (optional)"
+        "session_id": "uuid (optional)",
+        "use_llm": false (optional, use LLM service instead of TF-IDF)
     }
 
     Returns the best matching answer with confidence score.
@@ -64,10 +68,38 @@ def chat(request):
         user_question = serializer.validated_data['question']
         user_role = serializer.validated_data.get('role', 'both')
         session_id = serializer.validated_data.get('session_id')
+        use_llm = serializer.validated_data.get('use_llm', False)
 
-        # Get answer from chatbot with role filtering
-        chatbot = get_chatbot()
-        result = chatbot.get_answer(user_question, user_role=user_role)
+        result = None
+        method_used = 'tfidf'
+
+        # Try LLM if requested and enabled
+        if use_llm and settings.LLM_ENABLED:
+            try:
+                llm_service = get_llm_service()
+                llm_result = llm_service.get_answer(user_question, user_role=user_role)
+
+                # Check if LLM returned an error
+                if 'error' not in llm_result:
+                    result = {
+                        'answer': llm_result['answer'],
+                        'confidence': 0.95,  # High confidence for LLM responses
+                        'category': None,
+                        'matched_question': None,
+                        'faq_id': None
+                    }
+                    method_used = 'llm'
+                    logger.info(f"LLM chat query: {user_question[:50]}...")
+                else:
+                    logger.warning(f"LLM error: {llm_result.get('error')}, falling back to TF-IDF")
+            except Exception as llm_error:
+                logger.warning(f"LLM service failed: {str(llm_error)}, falling back to TF-IDF")
+
+        # Fallback to TF-IDF if LLM not used or failed
+        if result is None:
+            chatbot = get_chatbot()
+            result = chatbot.get_answer(user_question, user_role=user_role)
+            method_used = 'tfidf'
 
         # Generate session ID if not provided
         if not session_id:
@@ -91,7 +123,7 @@ def chat(request):
             except FAQ.DoesNotExist:
                 pass
 
-        logger.info(f"Chat query: {user_question[:50]}... -> confidence: {result['confidence']:.2f}")
+        logger.info(f"Chat query: {user_question[:50]}... -> method: {method_used}, confidence: {result['confidence']:.2f}")
 
         return success_response(
             'Answer retrieved.',
@@ -100,13 +132,101 @@ def chat(request):
                 'confidence': result['confidence'],
                 'category': result.get('category'),
                 'matched_question': result.get('matched_question'),
-                'session_id': session_id
+                'session_id': session_id,
+                'method': method_used
             }
         )
 
     except Exception as e:
         logger.error(f"Error in chat: {str(e)}", exc_info=True)
         return error_response('Failed to process question.', status_code=500)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def chat_stream(request):
+    """
+    Streaming chat endpoint for real-time LLM responses.
+
+    POST /api/assistant/chat-stream/
+
+    Body: {
+        "question": "Is blood donation safe?",
+        "role": "donor",
+        "session_id": "uuid (optional)"
+    }
+
+    Returns Server-Sent Events stream with chunks of the answer.
+    """
+    from django.http import StreamingHttpResponse
+
+    try:
+        # Validate request
+        serializer = ChatRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response('Invalid request.', errors=serializer.errors)
+
+        user_question = serializer.validated_data['question']
+        user_role = serializer.validated_data.get('role', 'both')
+        session_id = serializer.validated_data.get('session_id')
+
+        # Check if LLM is enabled
+        if not settings.LLM_ENABLED:
+            return error_response('LLM is not enabled. Please set LLM_ENABLED=true.', status_code=503)
+
+        def generate_stream():
+            """Generator function for SSE streaming"""
+            nonlocal session_id
+            try:
+                llm_service = get_llm_service()
+                full_answer = []
+
+                for chunk in llm_service.stream_answer(user_question, user_role=user_role):
+                    if chunk == '[DONE]':
+                        # Send completion signal
+                        yield f"data: {json.dumps({'done': True})}\n\n"
+                        break
+                    elif chunk.startswith('Error:'):
+                        # Send error
+                        yield f"data: {json.dumps({'error': chunk[6:]})}\n\n"
+                        break
+                    else:
+                        # Append to full answer and send chunk
+                        full_answer.append(chunk)
+                        yield f"data: {json.dumps({'content': chunk})}\n\n"
+
+                # Save to chat history after streaming completes
+                if full_answer:
+                    answer_text = ''.join(full_answer)
+                    if not session_id:
+                        session_id = uuid.uuid4()
+
+                    ChatHistory.objects.create(
+                        session_id=session_id,
+                        user_question=user_question,
+                        bot_answer=answer_text,
+                        confidence_score=0.95,
+                        category=None
+                    )
+                    logger.info(f"Streaming chat query: {user_question[:50]}... -> method: llm")
+
+            except Exception as e:
+                logger.error(f"Error in streaming chat: {str(e)}", exc_info=True)
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        return StreamingHttpResponse(
+            generate_stream(),
+            content_type='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',
+                'Connection': 'keep-alive'
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error in chat_stream: {str(e)}", exc_info=True)
+        return error_response('Failed to process streaming request.', status_code=500)
 
 
 @api_view(['GET'])
