@@ -445,6 +445,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   : _buildBody(roleProvider),
             ),
             bottomNavigationBar: _buildBottomNavigation(roleProvider),
+            floatingActionButton: _buildAIHelpButton(),
+            floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           ),
         );
       },
@@ -1861,13 +1863,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
           const SizedBox(width: 12),
           _QuickActionButton(
-            key: const ValueKey('action_ai_help'),
-            title: 'AI Help',
-            icon: Icons.smart_toy_outlined,
-            onTap: () => Navigator.pushNamed(context, AppRoutes.aiChatbot),
-          ),
-          const SizedBox(width: 12),
-          _QuickActionButton(
             key: const ValueKey('action_chat'),
             title: 'Chat',
             icon: Icons.message,
@@ -1893,12 +1888,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             title: 'Chat',
             icon: Icons.message,
             onTap: () => Navigator.pushNamed(context, AppRoutes.messages),
-          ),
-          const SizedBox(width: 12),
-          _QuickActionButton(
-            title: 'AI Help',
-            icon: Icons.smart_toy_outlined,
-            onTap: () => Navigator.pushNamed(context, AppRoutes.aiChatbot),
           ),
           const SizedBox(width: 12),
           _QuickActionButton(
@@ -2017,6 +2006,50 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAIHelpButton() {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.primary,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.pushNamed(context, AppRoutes.aiChatbot),
+          customBorder: const CircleBorder(),
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.smart_toy_outlined,
+                color: Colors.white,
+                size: 24,
+              ),
+              SizedBox(height: 2),
+              Text(
+                'AI Help',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
