@@ -299,7 +299,6 @@ class DonorResponseSerializer(serializers.ModelSerializer):
             'hospital_name',
             'units_pledged',
             'units_received',
-            'preferred_date',
             'note',
             'status',
             'status_display',
@@ -337,7 +336,6 @@ class DonorResponsePublicSerializer(serializers.ModelSerializer):
             'donor_name',
             'blood_group',
             'units_pledged',
-            'preferred_date',
             'note',
             'status',
             'status_display',
@@ -355,7 +353,6 @@ class DonorResponseCreateSerializer(serializers.ModelSerializer):
         model = DonorResponse
         fields = [
             'units_pledged',
-            'preferred_date',
             'note',
         ]
 

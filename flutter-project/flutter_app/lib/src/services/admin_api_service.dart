@@ -440,7 +440,6 @@ class AdminBloodRequestPledge {
   final String id;
   final AdminBloodRequestPledgeDonor? donor;
   final int unitsPledged;
-  final String? preferredDate;
   final String? note;
   final String status;
   final String createdAt;
@@ -450,7 +449,6 @@ class AdminBloodRequestPledge {
     required this.id,
     this.donor,
     required this.unitsPledged,
-    this.preferredDate,
     this.note,
     required this.status,
     required this.createdAt,
@@ -464,7 +462,6 @@ class AdminBloodRequestPledge {
           ? AdminBloodRequestPledgeDonor.fromJson(json['donor'])
           : null,
       unitsPledged: json['units_pledged'] ?? 0,
-      preferredDate: json['preferred_date'],
       note: json['note'],
       status: json['status'] ?? 'pledged',
       createdAt: json['created_at'] ?? '',

@@ -376,15 +376,6 @@ class _MyPledgesScreenState extends State<MyPledgesScreen> {
                 '${pledge.unitsPledged} unit${pledge.unitsPledged > 1 ? 's' : ''} pledged',
                 style: TextStyle(fontSize: 13, color: Colors.grey[700]),
               ),
-              if (pledge.preferredDate != null) ...[
-                const SizedBox(width: 16),
-                Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 6),
-                Text(
-                  _formatPreferredDate(pledge.preferredDate!),
-                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-                ),
-              ],
               if (pledge.unitsReceived > 0) ...[
                 const SizedBox(width: 16),
                 Icon(Icons.check_circle, size: 16, color: AppColors.online),
@@ -554,34 +545,6 @@ class _MyPledgesScreenState extends State<MyPledgesScreen> {
         return 'This pledge was cancelled';
       default:
         return '';
-    }
-  }
-
-  String _formatPreferredDate(String preferredDate) {
-    try {
-      // Try parsing with time (YYYY-MM-DD HH:MM format)
-      final dateTimeWithTime = RegExp(r'^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2})$');
-      final match = dateTimeWithTime.firstMatch(preferredDate);
-
-      if (match != null) {
-        final day = match.group(3);
-        final month = match.group(2);
-        final year = match.group(1);
-        final hour = match.group(4);
-        final minute = match.group(5);
-        // Format: DD/MM/YYYY at HH:MM
-        return '$day/$month/$year at $hour:$minute';
-      }
-
-      // If no time, return just the date
-      final parts = preferredDate.split('-');
-      if (parts.length == 3) {
-        return '${parts[2]}/${parts[1]}/${parts[0]}';
-      }
-
-      return preferredDate;
-    } catch (e) {
-      return preferredDate;
     }
   }
 

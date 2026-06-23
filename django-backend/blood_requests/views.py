@@ -754,7 +754,6 @@ def create_pledge(request, request_id):
             blood_request=blood_request,
             donor=request.user,
             units_pledged=pledge_serializer.validated_data.get('units_pledged', 1),
-            preferred_date=pledge_serializer.validated_data.get('preferred_date'),
             note=pledge_serializer.validated_data.get('note', ''),
             status='pledged'
         )
@@ -1226,7 +1225,6 @@ def admin_blood_request_detail(request, request_id):
                 'id': str(pledge.id),
                 'donor': donor_info,
                 'units_pledged': pledge.units_pledged,
-                'preferred_date': pledge.preferred_date.isoformat() if pledge.preferred_date else None,
                 'note': pledge.note,
                 'status': pledge.status,
                 'created_at': pledge.created_at.isoformat(),
@@ -2775,7 +2773,6 @@ def get_responding_donors_for_patient(request):
                 },
                 'pledge': {
                     'units_pledged': pledge.units_pledged,
-                    'preferred_date': pledge.preferred_date.isoformat() if pledge.preferred_date else None,
                     'note': pledge.note,
                     'status': pledge.status,
                     'status_display': pledge.get_status_display(),
