@@ -1177,8 +1177,30 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       displayNote = displayNote.substring(0, displayNote.length - 2);
     }
 
-    // Use preferred time if available (from note only)
+    // Use preferred time if available (from note), otherwise use pledge created date
     String formattedDate = preferredDateTime ?? '';
+
+    // If no preferred time found, show pledge date/time instead
+    if (formattedDate.isEmpty && pledge['created_at'] != null) {
+      try {
+        final createdAt = DateTime.parse(pledge['created_at'] as String);
+        final now = DateTime.now();
+        final difference = now.difference(createdAt);
+
+        // Format as relative time (e.g., "2 hours ago")
+        if (difference.inMinutes < 60) {
+          formattedDate = '${difference.inMinutes} min ago';
+        } else if (difference.inHours < 24) {
+          formattedDate = '${difference.inHours} hours ago';
+        } else if (difference.inDays < 7) {
+          formattedDate = '${difference.inDays} days ago';
+        } else {
+          formattedDate = '${createdAt.day}/${createdAt.month}/${createdAt.year}';
+        }
+      } catch (e) {
+        formattedDate = 'Unknown';
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1293,13 +1315,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Preferred: $formattedDate',
+                      preferredDateTime != null ? 'Preferred: $formattedDate' : 'Pledged: $formattedDate',
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    const Spacer(),
+                    // Show units pledged (blood pint)
+                    if (pledge['units_pledged'] != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.red.shade200, width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bloodtype, size: 14, color: Colors.red.shade700),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${pledge['units_pledged']} unit${pledge['units_pledged'] == 1 ? '' : 's'}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.red.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),

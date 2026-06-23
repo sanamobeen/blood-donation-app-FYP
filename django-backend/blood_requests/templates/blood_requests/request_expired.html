@@ -1,0 +1,38 @@
+{% extends "blood_requests/base.html" %}
+
+{% block title %}Request Expired{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align: center; max-width: 600px; margin: 0 auto;">
+    <div style="font-size: 4rem; margin-bottom: 20px;">⏰</div>
+    <h1 style="font-family: 'Poppins', sans-serif; font-size: 2rem; color: var(--text-dark); margin-bottom: 20px;">
+        This Request Has Expired
+    </h1>
+    <p style="font-size: 1.1rem; color: var(--text-light); margin-bottom: 30px;">
+        The blood request for <strong>{{ patient_name }}</strong> is no longer active.
+    </p>
+
+    <div class="alert alert-info" style="text-align: left;">
+        <h3 style="margin-bottom: 15px;">What You Can Do</h3>
+        <ul style="padding-left: 20px; line-height: 2;">
+            <li>Browse other active blood requests in your area</li>
+            <li>Download our mobile app to stay updated on urgent requests</li>
+            <li>Register as a donor to be notified when needs match your blood group</li>
+        </ul>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <p style="color: var(--text-light); margin-bottom: 15px;">
+            Want to help save lives? Download our app:
+        </p>
+        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <a href="#" class="btn btn-primary">
+                📱 Download for iOS
+            </a>
+            <a href="#" class="btn btn-primary">
+                🤖 Download for Android
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

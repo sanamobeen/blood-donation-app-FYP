@@ -41,3 +41,9 @@ from blood_requests.urls import admin_urlpatterns
 urlpatterns += [
     path('api/admin/blood-requests/', include((admin_urlpatterns, 'blood_requests'), namespace='admin_blood_requests')),
 ]
+
+# External Pledge System - Public web pages (no /api/ prefix)
+from blood_requests.urls import public_urlpatterns
+urlpatterns += [
+    path('', include((public_urlpatterns, 'blood_requests'), namespace='public_blood_requests')),
+]

@@ -15,6 +15,7 @@ class BloodRequestSerializer(serializers.ModelSerializer):
         model = BloodRequest
         fields = [
             'id',
+            'share_id',  # External pledge system: Short shareable ID
             'patient_name',
             'blood_group',
             'units_needed',
@@ -128,6 +129,7 @@ class DetailedBloodRequestSerializer(serializers.ModelSerializer):
         model = BloodRequest
         fields = [
             'id',
+            'share_id',  # External pledge system: Short shareable ID
             'patient_name',
             'blood_group',
             'units_needed',
@@ -195,6 +197,7 @@ class PublicBloodRequestSerializer(serializers.ModelSerializer):
         model = BloodRequest
         fields = [
             'id',
+            'share_id',  # External pledge system: Short shareable ID
             'patient_name',
             'blood_group',
             'units_needed',
@@ -217,7 +220,7 @@ class PublicBloodRequestSerializer(serializers.ModelSerializer):
             'requester_profile_picture',
             'requested_by_id',
         ]
-        read_only_fields = ['id', 'created_at', 'is_urgent', 'requester_name', 'requester_profile_picture', 'requested_by_id', 'expires_soon']
+        read_only_fields = ['id', 'share_id', 'created_at', 'is_urgent', 'requester_name', 'requester_profile_picture', 'requested_by_id', 'expires_soon']
 
     def get_expires_soon(self, obj):
         """Check if request expires within 1 hour."""
@@ -395,3 +398,105 @@ class BatchAcceptPledgesSerializer(serializers.Serializer):
         max_length=50
     )
     patient_note = serializers.CharField(required=False, allow_blank=True, max_length=500)
+
+
+# ============================================================================
+# EXTERNAL PLEDGE SYSTEM SERIALIZERS
+# ============================================================================
+
+class ExternalDonorPledgeCreateSerializer(serializers.Serializer):
+    """
+    Serializer for creating external pledges (from web page).
+    Validates input data from non-authenticated users.
+    """
+    blood_request_id = serializers.UUIDField(required=True, help_text="UUID of the blood request")
+    donor_name = serializers.CharField(
+        required=True,
+        min_length=2,
+        max_length=255,
+        help_text="Full name of the donor"
+    )
+    donor_phone = serializers.CharField(
+        required=True,
+        min_length=10,
+        max_length=20,
+        help_text="Phone number of the donor"
+    )
+    donor_blood_group = serializers.ChoiceField(
+        required=True,
+        choices=[('A+', 'A+'), ('A-', 'A-'), ('B+', 'B+'), ('B-', 'B-'),
+                 ('AB+', 'AB+'), ('AB-', 'AB-'), ('O+', 'O+'), ('O-', 'O-')],
+        help_text="Blood group of the donor"
+    )
+    note = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=500,
+        help_text="Optional note from donor to patient"
+    )
+
+    def validate_donor_name(self, value):
+        """Validate donor name contains only allowed characters."""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Donor name is required")
+        # Allow letters, spaces, hyphens, and apostrophes
+        if not re.match(r'^[A-Za-z\s\-\'\.]+$', value.strip()):
+            raise serializers.ValidationError("Name can only contain letters, spaces, hyphens, and apostrophes")
+        return value.strip()
+
+    def validate_donor_phone(self, value):
+        """Validate phone number format."""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Phone number is required")
+        value = value.strip()
+        value = re.sub(r'[\s\-\(\)]', '', value)
+        # Allow international format (+...) or digits only
+        if not re.match(r'^(\+[1-9]\d{6,14}|[0-9]{10,15})$', value):
+            raise serializers.ValidationError("Phone number must be in international format (+999999999) or local format")
+        return value
+
+
+class PublicBloodRequestPageSerializer(serializers.ModelSerializer):
+    """
+    Enhanced serializer for public blood request page.
+    Shows only public information - hides sensitive data.
+    """
+    class Meta:
+        model = BloodRequest
+        fields = [
+            'share_id',
+            'patient_name',
+            'blood_group',
+            'units_needed',
+            'units_pledged',
+            'units_received',
+            'responders_count',
+            'urgency_level',
+            'hospital_name',
+            'location',
+            'expires_at',
+            'status',
+        ]
+        read_only_fields = ['share_id', 'units_pledged', 'units_received', 'responders_count']
+
+
+class BloodRequestShareSerializer(serializers.ModelSerializer):
+    """
+    Serializer for blood request with share_id.
+    Used when returning blood request data that includes share_id.
+    """
+    class Meta:
+        model = BloodRequest
+        fields = [
+            'id',
+            'share_id',
+            'patient_name',
+            'blood_group',
+            'units_needed',
+            'units_pledged',
+            'urgency_level',
+            'hospital_name',
+            'location',
+            'status',
+        ]
+        read_only_fields = ['id', 'share_id']
