@@ -25,7 +25,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _selectedTabIndex = 4; // Profile tab is index 4
 
   // Toggle states
-  bool _notificationsEnabled = true;
   bool _donationRemindersEnabled = true;
 
   // User data
@@ -154,38 +153,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           icon: Icons.lock_outline,
                           onTap: () {
                             Navigator.pushNamed(context, AppRoutes.changePassword);
-                          },
-                        ),
-                        _SettingsItem(
-                          title: 'Privacy',
-                          icon: Icons.privacy_tip_outlined,
-                          onTap: () => _showComingSoon('Privacy Settings'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Preferences Section
-                    _buildSettingsSection(
-                      title: 'Preferences',
-                      icon: Icons.settings_outlined,
-                      items: [
-                        _SettingsItem(
-                          title: 'Notifications',
-                          icon: Icons.notifications_outlined,
-                          trailing: Switch(
-                            value: _notificationsEnabled,
-                            activeColor: AppColors.primary,
-                            onChanged: (value) {
-                              setState(() {
-                                _notificationsEnabled = value;
-                              });
-                            },
-                          ),
-                          onTap: () {
-                            setState(() {
-                              _notificationsEnabled = !_notificationsEnabled;
-                            });
                           },
                         ),
                       ],

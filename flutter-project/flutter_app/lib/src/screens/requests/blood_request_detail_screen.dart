@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart'; // External pledge system: Share functionality
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../services/firebase_chat_service.dart';
@@ -76,6 +77,8 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
   }
 
   Future<void> _loadRequestDetail() async {
+    print('🐛 [_loadRequestDetail] Loading request detail for ID: ${widget.requestId}');
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -84,10 +87,22 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
     try {
       final response = await ApiService.getBloodRequestDetail(widget.requestId);
 
+      print('🐛 [_loadRequestDetail] API response success: ${response.success}');
+      print('🐛 [_loadRequestDetail] API response message: ${response.message}');
+
+      if (response.bloodRequest != null) {
+        print('🐛 [_loadRequestDetail] BloodRequest loaded');
+        print('🐛 [_loadRequestDetail] BloodRequest.shareId: ${response.bloodRequest!.shareId}');
+        print('🐛 [_loadRequestDetail] BloodRequest.id: ${response.bloodRequest!.id}');
+      } else {
+        print('🐛 [_loadRequestDetail] ERROR: BloodRequest is null!');
+      }
+
       if (mounted) {
         setState(() {
           if (response.success && response.bloodRequest != null) {
             _request = response.bloodRequest;
+            print('🐛 [_loadRequestDetail] _request assigned successfully');
           } else {
             _errorMessage = response.message;
           }
@@ -105,6 +120,7 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
         _checkDonorEligibility();
       }
     } catch (e) {
+      print('🐛 [_loadRequestDetail] EXCEPTION: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -1145,14 +1161,71 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
     }
   }
 
-  void _shareRequest() {
-    // TODO: Implement share functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Share functionality coming soon'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  void _shareRequest() async {
+    // External pledge system: Share blood request link
+    print('🐛 [_shareRequest] Share button pressed');
+    print('🐛 [_shareRequest] _request is null: ${_request == null}');
+
+    if (_request == null) {
+      print('🐛 [_shareRequest] ERROR: _request is null, cannot share!');
+      return;
+    }
+
+    final request = _request!;
+
+    print('🐛 [_shareRequest] ===== DEBUGGING SHARE ID =====');
+    print('🐛 [_shareRequest] request.shareId: ${request.shareId}');
+    print('🐛 [_shareRequest] request.shareId type: ${request.shareId.runtimeType}');
+    print('🐛 [_shareRequest] request.shareId == null: ${request.shareId == null}');
+    print('🐛 [_shareRequest] request.id: ${request.id}');
+    print('🐛 [_shareRequest] request.id type: ${request.id.runtimeType}');
+
+    // Generate share link using share_id or fall back to id
+    // For production: 'https://yourdomain.com/request'
+    // For local testing with ngrok: 'https://6411-103-150-239-29.ngrok-free.app/request'
+    final baseUrl = 'https://6411-103-150-239-29.ngrok-free.app/request';
+
+    final shareId = request.shareId ?? request.id;
+    print('🐛 [_shareRequest] Selected shareId: $shareId');
+    print('🐛 [_shareRequest] Using share_id: ${request.shareId != null ? 'YES ✅' : 'NO ❌ (using id instead)'}');
+
+    final shareUrl = '$baseUrl/$shareId';
+    print('🐛 [_shareRequest] Final share URL: $shareUrl');
+    print('🐛 [_shareRequest] ===== END DEBUGGING =====');
+
+    // Create formatted share message
+    // URL at very end with no hashtags after it for better WhatsApp recognition
+    final shareMessage = '''
+🩸 *Urgent Blood Request Needed!*
+
+👤 Patient: ${request.patientName}
+🩸 Blood Group: ${request.bloodGroup}
+📊 Units Needed: ${request.unitsNeeded}
+⚠️ Urgency: ${request.urgencyLevel.toUpperCase()}
+🏥 Hospital: ${request.hospitalName ?? 'Not specified'}
+📍 Location: ${request.location ?? 'Not specified'}
+
+Help save a life! View details and pledge at:
+$shareUrl''';
+
+    try {
+      await Share.share(
+        shareMessage,
+        subject: 'Urgent Blood Request - ${request.patientName}',
+      );
+      print('🐛 [_shareRequest] Share successful!');
+    } catch (e) {
+      print('🐛 [_shareRequest] Share error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing: $e'),
+            backgroundColor: AppColors.urgencyCritical,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _openChatWithPatient() async {

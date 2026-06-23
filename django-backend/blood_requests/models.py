@@ -42,6 +42,17 @@ class BloodRequest(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # External pledge system: Short shareable ID for public links
+    share_id = models.CharField(
+        max_length=12,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Short shareable ID for external sharing (e.g., abc123xy)"
+    )
+
     patient_name = models.CharField(
         max_length=255,
         help_text="Name of the patient requiring blood"
@@ -207,6 +218,8 @@ class BloodRequest(models.Model):
             models.Index(fields=['location_lat', 'location_lng']),
             models.Index(fields=['expires_at']),
             models.Index(fields=['-urgency_level', '-created_at']),
+            # External pledge system: share_id index for fast lookups
+            models.Index(fields=['share_id']),
         ]
 
     def __str__(self):
@@ -221,6 +234,32 @@ class BloodRequest(models.Model):
     def units_remaining(self):
         """Calculate units remaining to fulfill the request"""
         return max(0, self.units_needed - self.units_pledged)
+
+    def save(self, *args, **kwargs):
+        """Override save to generate share_id on first save"""
+        # Generate share_id on first save if not set
+        if not self.share_id:
+            self.share_id = self._generate_share_id()
+        super().save(*args, **kwargs)
+
+    def _generate_share_id(self):
+        """Generate a unique 8-character share ID for public sharing"""
+        import secrets
+        import string
+        alphabet = string.ascii_lowercase + string.digits
+
+        # Generate a candidate share_id until we find a unique one
+        max_attempts = 100
+        for _ in range(max_attempts):
+            candidate = ''.join(secrets.choice(alphabet) for _ in range(8))
+            # Check if this share_id already exists
+            if not BloodRequest.objects.filter(share_id=candidate).exists():
+                return candidate
+
+        # Fallback to UUID-based share_id if all attempts fail
+        import hashlib
+        hash_object = hashlib.md5(str(uuid.uuid4()).encode())
+        return hash_object.hexdigest()[:8]
 
 
 class DonorResponse(models.Model):

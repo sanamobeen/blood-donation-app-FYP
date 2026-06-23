@@ -1,0 +1,38 @@
+{% extends "blood_requests/base.html" %}
+
+{% block title %}Request Not Found{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align: center; max-width: 600px; margin: 0 auto;">
+    <div style="font-size: 4rem; margin-bottom: 20px;">🔍</div>
+    <h1 style="font-family: 'Poppins', sans-serif; font-size: 2rem; color: var(--text-dark); margin-bottom: 20px;">
+        Request Not Found
+    </h1>
+    <p style="font-size: 1.1rem; color: var(--text-light); margin-bottom: 30px;">
+        We couldn't find the blood request you're looking for. It may have been removed or the link might be incorrect.
+    </p>
+
+    <div class="alert alert-info" style="text-align: left;">
+        <h3 style="margin-bottom: 15px;">What You Can Do</h3>
+        <ul style="padding-left: 20px; line-height: 2;">
+            <li>Check the link and try again</li>
+            <li>Contact the person who shared this link with you</li>
+            <li>Browse other active blood requests in our mobile app</li>
+        </ul>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <p style="color: var(--text-light); margin-bottom: 15px;">
+            Want to help save lives? Download our app:
+        </p>
+        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <a href="#" class="btn btn-primary">
+                📱 Download for iOS
+            </a>
+            <a href="#" class="btn btn-primary">
+                🤖 Download for Android
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
