@@ -1110,7 +1110,6 @@ class ApiService {
   static Future<Map<String, dynamic>> createPledge({
     required String requestId,
     required int unitsPledged,
-    String? preferredDate,
     String? note,
   }) async {
     try {
@@ -1119,7 +1118,6 @@ class ApiService {
 
       final requestBody = jsonEncode({
         'units_pledged': unitsPledged,
-        if (preferredDate != null) 'preferred_date': preferredDate,
         if (note != null) 'note': note,
       });
 

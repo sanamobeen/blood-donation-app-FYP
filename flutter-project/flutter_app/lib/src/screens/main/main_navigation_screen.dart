@@ -1177,22 +1177,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       displayNote = displayNote.substring(0, displayNote.length - 2);
     }
 
-    // Format preferred date if available
-    String formattedDate = '';
-    if (pledge['preferred_date'] != null) {
-      try {
-        final dateStr = pledge['preferred_date'] as String;
-        final date = DateTime.parse(dateStr);
-        formattedDate = '${date.day}/${date.month}/${date.year}';
-        if (preferredDateTime != null) {
-          formattedDate += ' at $preferredDateTime';
-        }
-      } catch (e) {
-        formattedDate = pledge['preferred_date'] as String? ?? '';
-      }
-    } else if (preferredDateTime != null) {
-      formattedDate = preferredDateTime;
-    }
+    // Use preferred time if available (from note only)
+    String formattedDate = preferredDateTime ?? '';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

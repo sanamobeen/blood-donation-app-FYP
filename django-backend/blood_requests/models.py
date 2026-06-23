@@ -278,11 +278,6 @@ class DonorResponse(models.Model):
         default=0,
         help_text="Number of units actually received"
     )
-    preferred_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="Preferred donation date"
-    )
     note = models.TextField(
         blank=True,
         null=True,

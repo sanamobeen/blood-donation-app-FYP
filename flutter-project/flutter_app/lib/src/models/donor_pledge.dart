@@ -17,7 +17,6 @@ class DonorPledge {
   final String? hospitalName;
   final int unitsPledged;
   final int unitsReceived;
-  final String? preferredDate;
   final String? note;
   final String status;
   final String? statusDisplay;
@@ -45,7 +44,6 @@ class DonorPledge {
     this.hospitalName,
     required this.unitsPledged,
     this.unitsReceived = 0,
-    this.preferredDate,
     this.note,
     required this.status,
     this.statusDisplay,
@@ -78,7 +76,6 @@ class DonorPledge {
       hospitalName: json['hospital_name']?.toString(),
       unitsPledged: json['units_pledged'] as int? ?? 1,
       unitsReceived: json['units_received'] as int? ?? 0,
-      preferredDate: json['preferred_date']?.toString(),
       note: json['note']?.toString(),
       status: json['status']?.toString() ?? 'pending',
       statusDisplay: json['status_display']?.toString(),
@@ -118,7 +115,6 @@ class DonorPledge {
       'hospital_name': hospitalName,
       'units_pledged': unitsPledged,
       'units_received': unitsReceived,
-      'preferred_date': preferredDate,
       'note': note,
       'status': status,
       'created_at': createdAt.toIso8601String(),
