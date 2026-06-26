@@ -646,6 +646,7 @@ class ApiService {
     String? additionalNotes,
     double? locationLat,
     double? locationLng,
+    Map<String, dynamic>? quizResponses,
   }) async {
     try {
 
@@ -664,6 +665,7 @@ class ApiService {
           if (additionalNotes != null && additionalNotes.isNotEmpty) 'additional_notes': additionalNotes,
           if (locationLat != null && locationLng != null) 'location_lat': locationLat,
           if (locationLat != null && locationLng != null) 'location_lng': locationLng,
+          if (quizResponses != null) 'quiz_responses': quizResponses,
         }),
       );
 
@@ -691,26 +693,47 @@ class ApiService {
 
   /// Get a specific blood request detail (public endpoint, but sends auth for consistency)
   static Future<BloodRequestDetailResponse> getBloodRequestDetail(String requestId) async {
+    print('🐛 [ApiService.getBloodRequestDetail] Fetching request ID: $requestId');
+
     try {
 
       // Get auth headers for consistency
       final headers = await getAuthHeaders();
+      final url = Uri.parse('${ApiConfig.bloodRequestsEndpoint}/$requestId/');
+      print('🐛 [ApiService.getBloodRequestDetail] URL: $url');
+
       final response = await http.get(
-        Uri.parse('${ApiConfig.bloodRequestsEndpoint}/$requestId/'),
+        url,
         headers: headers,
       );
 
+      print('🐛 [ApiService.getBloodRequestDetail] Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        print('🐛 [ApiService.getBloodRequestDetail] Response data keys: ${data.keys.toList()}');
+
+        // Check if blood_request exists in response
+        if (data['blood_request'] != null) {
+          final bloodRequestData = data['blood_request'] as Map<String, dynamic>;
+          print('🐛 [ApiService.getBloodRequestDetail] blood_request keys: ${bloodRequestData.keys.toList()}');
+          print('🐛 [ApiService.getBloodRequestDetail] blood_request.share_id: ${bloodRequestData['share_id']}');
+          print('🐛 [ApiService.getBloodRequestDetail] blood_request.id: ${bloodRequestData['id']}');
+        } else {
+          print('🐛 [ApiService.getBloodRequestDetail] ERROR: blood_request is null in response!');
+        }
+
         return BloodRequestDetailResponse.fromJson(data);
       } else {
+        print('🐛 [ApiService.getBloodRequestDetail] ERROR: Status code ${response.statusCode}');
+        print('🐛 [ApiService.getBloodRequestDetail] Response body: ${response.body}');
         return BloodRequestDetailResponse(
           success: false,
           message: 'Failed to fetch blood request detail',
         );
       }
     } catch (e) {
+      print('🐛 [ApiService.getBloodRequestDetail] EXCEPTION: $e');
       return BloodRequestDetailResponse(
         success: false,
         message: 'Network error: $e',
@@ -1110,7 +1133,6 @@ class ApiService {
   static Future<Map<String, dynamic>> createPledge({
     required String requestId,
     required int unitsPledged,
-    String? preferredDate,
     String? note,
   }) async {
     try {
@@ -1119,7 +1141,6 @@ class ApiService {
 
       final requestBody = jsonEncode({
         'units_pledged': unitsPledged,
-        if (preferredDate != null) 'preferred_date': preferredDate,
         if (note != null) 'note': note,
       });
 

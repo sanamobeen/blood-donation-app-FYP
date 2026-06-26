@@ -654,7 +654,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> with WidgetsBindi
             // Already on Home
             break;
           case 1:
-            // Navigate to Create Request
+            // Navigate to Create Request directly
             Navigator.pushNamed(context, AppRoutes.bloodRequestForm);
             break;
           case 2:

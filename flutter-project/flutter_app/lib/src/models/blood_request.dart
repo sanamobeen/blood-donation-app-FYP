@@ -22,6 +22,7 @@ class BloodRequest {
   final String? requesterName;
   final String? requestedById;
   final String? requesterProfilePicture;
+  final String? shareId; // External pledge system: Short shareable ID
 
   BloodRequest({
     required this.id,
@@ -45,6 +46,7 @@ class BloodRequest {
     this.requesterName,
     this.requestedById,
     this.requesterProfilePicture,
+    this.shareId, // External pledge system
   });
 
   /// Helper to parse nullable double from JSON (handles String from Django DecimalField)
@@ -62,6 +64,16 @@ class BloodRequest {
 
   /// Create BloodRequest from JSON
   factory BloodRequest.fromJson(Map<String, dynamic> json) {
+    // Debug logging for share_id parsing
+    print('🐛 [BloodRequest.fromJson] Parsing BloodRequest from JSON');
+    print('🐛 [BloodRequest.fromJson] JSON keys: ${json.keys.toList()}');
+    print('🐛 [BloodRequest.fromJson] share_id raw value: ${json['share_id']}');
+    print('🐛 [BloodRequest.fromJson] share_id type: ${json['share_id'].runtimeType}');
+    print('🐛 [BloodRequest.fromJson] id value: ${json['id']}');
+
+    final shareIdValue = json['share_id']?.toString();
+    print('🐛 [BloodRequest.fromJson] share_id parsed value: $shareIdValue');
+
     // Safe parsing with null checks and defaults
     return BloodRequest(
       id: json['id']?.toString() ?? '',
@@ -85,6 +97,7 @@ class BloodRequest {
       requesterName: json['requester_name']?.toString(),
       requestedById: json['requested_by_id']?.toString(),
       requesterProfilePicture: json['requester_profile_picture']?.toString(),
+      shareId: shareIdValue, // External pledge system
     );
   }
 
@@ -188,6 +201,7 @@ class BloodRequest {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? requesterName,
+    String? shareId, // External pledge system
   }) {
     return BloodRequest(
       id: id ?? this.id,
@@ -209,6 +223,7 @@ class BloodRequest {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       requesterName: requesterName ?? this.requesterName,
+      shareId: shareId ?? this.shareId, // External pledge system
     );
   }
 

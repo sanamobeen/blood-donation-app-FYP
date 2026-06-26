@@ -10,12 +10,20 @@ Provides endpoints for:
 - Getting current user's blood requests
 """
 import logging
+import secrets
+import string
+from functools import wraps
 from rest_framework import status, serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from datetime import datetime, timedelta
 from django.utils import timezone
+from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404
+from django.core.cache import cache
+from django.views.decorators.csrf import csrf_exempt
+from django.db.models import F
 
 from .serializers import (
     BloodRequestSerializer,
@@ -167,6 +175,26 @@ def blood_request_create(request):
         if serializer.is_valid():
             blood_request = serializer.save()
             logger.info(f"Blood request saved - lat: {blood_request.location_lat}, lng: {blood_request.location_lng}")
+
+            # Create PatientQuiz record if quiz_responses were provided
+            quiz_responses = request.data.get('quiz_responses')
+            if quiz_responses and isinstance(quiz_responses, dict):
+                from .models import PatientQuiz
+                try:
+                    PatientQuiz.objects.create(
+                        blood_request=blood_request,
+                        had_blood_transfusion=quiz_responses.get('had_blood_transfusion', False),
+                        had_tattoo_piercing=quiz_responses.get('had_tattoo_piercing', False),
+                        had_surgery=quiz_responses.get('had_surgery', False),
+                        on_medication=quiz_responses.get('on_medication', False),
+                        has_chronic_disease=quiz_responses.get('has_chronic_disease', False),
+                        traveled_malaria_area=quiz_responses.get('traveled_malaria_area', False),
+                        other_medical_info=quiz_responses.get('other_medical_info'),
+                    )
+                    logger.info(f"PatientQuiz created for blood request: {blood_request.id}")
+                except Exception as quiz_error:
+                    logger.error(f"Failed to create PatientQuiz: {str(quiz_error)}")
+                    # Continue even if quiz creation fails
 
             # Phase 1: Set expiration based on urgency
             from .utils import calculate_request_expiration_hours
@@ -754,7 +782,6 @@ def create_pledge(request, request_id):
             blood_request=blood_request,
             donor=request.user,
             units_pledged=pledge_serializer.validated_data.get('units_pledged', 1),
-            preferred_date=pledge_serializer.validated_data.get('preferred_date'),
             note=pledge_serializer.validated_data.get('note', ''),
             status='pledged'
         )
@@ -767,10 +794,16 @@ def create_pledge(request, request_id):
         logger.info(f"✅ Blood request updated: units_pledged={blood_request.units_pledged}, responders={blood_request.responders_count}")
 
         # Create notification for the patient
+        logger.info(f"🔔 Checking if notification should be created...")
+        logger.info(f"🔔 blood_request.requested_by: {blood_request.requested_by}")
+        logger.info(f"🔔 blood_request.requested_by.email: {blood_request.requested_by.email if blood_request.requested_by else 'None'}")
+
         if blood_request.requested_by:
             try:
+                logger.info(f"🔔 Creating internal pledge notification for patient {blood_request.requested_by.email}")
                 from notifications.views import send_push_notification
-                send_push_notification(
+
+                notification = send_push_notification(
                     user=blood_request.requested_by,
                     title='New Pledge Received! 🩸',
                     message=f'{request.user.full_name or request.user.email} has pledged to donate {blood_request.blood_group} blood for {blood_request.patient_name}.',
@@ -781,9 +814,14 @@ def create_pledge(request, request_id):
                     },
                     send_push=True
                 )
+                logger.info(f"✅ Internal pledge notification created: ID={notification.id if notification else 'N/A'}")
                 logger.info(f"✅ Notification sent to patient: {blood_request.requested_by.email}")
             except Exception as e:
                 logger.warning(f"⚠️  Failed to send notification: {str(e)}")
+                import traceback
+                logger.warning(f"⚠️  Traceback: {traceback.format_exc()}")
+        else:
+            logger.warning(f"⚠️  Skipping notification - blood_request.requested_by is None")
 
         logger.info(f"🎉 Pledge creation SUCCESS")
         return success_response(
@@ -1226,7 +1264,6 @@ def admin_blood_request_detail(request, request_id):
                 'id': str(pledge.id),
                 'donor': donor_info,
                 'units_pledged': pledge.units_pledged,
-                'preferred_date': pledge.preferred_date.isoformat() if pledge.preferred_date else None,
                 'note': pledge.note,
                 'status': pledge.status,
                 'created_at': pledge.created_at.isoformat(),
@@ -1450,15 +1487,21 @@ def accept_pledge(request, request_id, pledge_id):
                     conversation_id = str(conversation.id)
                     logger.info(f"Existing conversation reused for pledge {pledge_id}")
                 else:
-                    # Create new conversation
-                    conversation = Conversation.objects.create(
-                        blood_request=blood_request,
-                        pledge=pledge,
-                        patient=request.user,
-                        donor=pledge.donor
-                    )
-                    conversation_id = str(conversation.id)
-                    logger.info(f"New conversation created for pledge {pledge_id}")
+                    # Check if this is an external pledge (donor is None)
+                    if pledge.donor is None:
+                        # External pledge - no chat conversation needed
+                        conversation_id = None
+                        logger.info(f"External pledge {pledge_id} accepted - no chat conversation created")
+                    else:
+                        # Create new conversation for registered donors
+                        conversation = Conversation.objects.create(
+                            blood_request=blood_request,
+                            pledge=pledge,
+                            patient=request.user,
+                            donor=pledge.donor
+                        )
+                        conversation_id = str(conversation.id)
+                        logger.info(f"New conversation created for pledge {pledge_id}")
             except ImportError:
                 conversation_id = None
                 logger.warning("Chat app not available")
@@ -1484,8 +1527,14 @@ def accept_pledge(request, request_id, pledge_id):
             if conversation_id:
                 response_data['conversation_id'] = conversation_id
 
+            # Different success messages for external vs registered donors
+            if pledge.donor is None:
+                success_message = 'External pledge confirmed. Donor contact details are in the pledge note.'
+            else:
+                success_message = 'Pledge confirmed and chat created.'
+
             return success_response(
-                message='Pledge confirmed and chat created.',
+                message=success_message,
                 data=response_data
             )
 
@@ -2744,6 +2793,70 @@ def get_responding_donors_for_patient(request):
                 continue
 
             donor = pledge.donor
+            is_external_pledge = not donor
+
+            # For external pledges, extract donor info from note
+            if is_external_pledge:
+                # Parse note to extract phone and name
+                # Note format: "Optional note\n\nPhone: +1234567890"
+                donor_name = "External Donor"
+                donor_phone = None
+                donor_note = pledge.note or ""
+
+                if pledge.note and 'Phone:' in pledge.note:
+                    parts = pledge.note.split('Phone:')
+                    if len(parts) > 1:
+                        donor_phone = parts[-1].strip()
+                        # Try to get name from first part (before Phone:)
+                        name_part = parts[0].strip()
+                        if name_part and name_part != 'Phone:':
+                            # Remove "Phone:" label and get the actual name
+                            lines = name_part.split('\n')
+                            if lines and lines[0].strip():
+                                donor_name = lines[0].strip()
+                            # Also remove the phone from the note for cleaner display
+                            donor_note = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ""
+
+                # Count by status
+                if pledge.status == 'pledged':
+                    pledged_count += 1
+                elif pledge.status == 'confirmed':
+                    confirmed_count += 1
+                elif pledge.status == 'on_the_way':
+                    on_the_way_count += 1
+                elif pledge.status == 'completed':
+                    completed_count += 1
+
+                donor_info = {
+                    'pledge_id': str(pledge.id),
+                    'request_id': str(pledge.blood_request.id),
+                    'patient_name': pledge.blood_request.patient_name,
+                    'blood_group': pledge.blood_request.blood_group,
+                    'is_external': True,  # Flag to indicate external donor
+                    'donor': {
+                        'id': None,
+                        'name': donor_name,
+                        'email': None,
+                        'phone': donor_phone,
+                        'blood_group': pledge.blood_request.blood_group,  # Use request's blood group for external donors
+                        'city': None,
+                    },
+                    'pledge': {
+                        'units_pledged': pledge.units_pledged,  # Blood pint
+                        'note': donor_note,
+                        'status': pledge.status,
+                        'status_display': pledge.get_status_display(),
+                        'created_at': pledge.created_at.isoformat(),  # Pledge date and time
+                        'is_confirmed': pledge.status == 'confirmed',
+                        'can_accept': pledge.status in ['pledged', 'shortlisted'],
+                        'can_reject': pledge.status in ['pledged', 'shortlisted', 'confirmed'],
+                        'can_complete': pledge.status in ['arrived', 'ready'],
+                    }
+                }
+                donor_data.append(donor_info)
+                continue
+
+            # For registered donors (existing code)
             if not donor:
                 continue
 
@@ -2765,6 +2878,7 @@ def get_responding_donors_for_patient(request):
                 'request_id': str(pledge.blood_request.id),
                 'patient_name': pledge.blood_request.patient_name,
                 'blood_group': pledge.blood_request.blood_group,
+                'is_external': False,
                 'donor': {
                     'id': str(donor.id),
                     'name': donor.full_name or donor.email.split('@')[0],
@@ -2775,7 +2889,6 @@ def get_responding_donors_for_patient(request):
                 },
                 'pledge': {
                     'units_pledged': pledge.units_pledged,
-                    'preferred_date': pledge.preferred_date.isoformat() if pledge.preferred_date else None,
                     'note': pledge.note,
                     'status': pledge.status,
                     'status_display': pledge.get_status_display(),
@@ -2808,3 +2921,405 @@ def get_responding_donors_for_patient(request):
             message='Failed to fetch responding donors.',
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+# ============================================================================
+# EXTERNAL PLEDGE SYSTEM VIEWS
+# ============================================================================
+
+def rate_limit(max_requests=5, period=3600):
+    """
+    Rate limiting decorator: max_requests per period (seconds) per IP address.
+    Uses Django's cache framework to track request counts.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped(request, *args, **kwargs):
+            # Get client IP address
+            ip_addr = request.META.get('REMOTE_ADDR')
+            if not ip_addr:
+                ip_addr = request.META.get('HTTP_X_FORWARDED_FOR', 'unknown')
+
+            # Create cache key for this IP
+            key = f'rate_limit:external_pledge:{ip_addr}'
+
+            # Get current count
+            count = cache.get(key, 0)
+
+            # Check if limit exceeded
+            if count >= max_requests:
+                logger.warning(f"Rate limit exceeded for IP: {ip_addr}")
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Rate limit exceeded. Please try again later.'
+                }, status=429)
+
+            # Increment counter
+            cache.set(key, count + 1, period)
+
+            return view_func(request, *args, **kwargs)
+        return wrapped
+    return decorator
+
+
+def public_blood_request_page(request, share_id):
+    """
+    Public web page for blood request sharing.
+
+    GET /request/{share_id}/
+
+    Displays:
+    - Blood request details (public info only)
+    - Real-time progress bar
+    - External pledge form
+
+    Privacy: Only shows public information (patient name, blood group,
+    units needed, hospital, location, urgency). Hides contact numbers
+    and exact addresses.
+    """
+    try:
+        # Fetch blood request by share_id
+        blood_request = get_object_or_404(
+            BloodRequest,
+            share_id=share_id,
+            is_active=True
+        )
+
+        # Check if request has expired
+        if blood_request.expires_at and blood_request.expires_at < timezone.now():
+            return render(request, 'blood_requests/request_expired.html', {
+                'patient_name': blood_request.patient_name,
+            })
+
+        # Calculate progress percentage
+        progress_percent = 0
+        if blood_request.units_needed > 0:
+            progress_percent = min(100, int((blood_request.units_pledged / blood_request.units_needed) * 100))
+
+        # Context data for template
+        context = {
+            'blood_request': blood_request,
+            'share_id': share_id,
+            'progress_percent': progress_percent,
+            'units_remaining': blood_request.units_remaining,
+            'responders_count': blood_request.responders_count,
+            'is_fulfilled': blood_request.units_pledged >= blood_request.units_needed,
+            'time_remaining': None,
+        }
+
+        # Calculate time remaining
+        if blood_request.expires_at:
+            time_delta = blood_request.expires_at - timezone.now()
+            if time_delta.total_seconds() > 0:
+                hours = int(time_delta.total_seconds() / 3600)
+                context['time_remaining'] = f"{hours} hours"
+
+        logger.info(f"Public request page accessed: share_id={share_id}")
+
+        return render(request, 'blood_requests/public_request_page.html', context)
+
+    except Exception as e:
+        logger.error(f"Error loading public request page: {str(e)}", exc_info=True)
+        return render(request, 'blood_requests/request_not_found.html', status=404)
+
+
+@csrf_exempt
+@rate_limit(max_requests=5, period=3600)  # 5 pledges per hour per IP
+def create_external_pledge(request):
+    """
+    External pledge creation API endpoint (no authentication required).
+
+    POST /api/external-pledge/
+
+    Request Body:
+    {
+        "blood_request_id": "uuid",
+        "donor_name": "John Doe",
+        "donor_phone": "+1234567890",
+        "donor_blood_group": "A+",
+        "note": "I can donate in the morning"
+    }
+
+    Response:
+    {
+        "success": true,
+        "message": "Pledge created successfully",
+        "data": {
+            "pledge_id": "uuid",
+            "units_pledged": 1
+        }
+    }
+
+    Features:
+    - No authentication required
+    - Input validation (phone, blood group, name)
+    - Rate limiting (5 pledges/hour per IP)
+    - Creates DonorResponse with donor=null
+    - Updates BloodRequest units_pledged
+    - Sends notification to patient
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            'success': False,
+            'error': 'Only POST method allowed'
+        }, status=405)
+
+    try:
+        import json
+        from notifications.views import send_push_notification
+
+        data = json.loads(request.body)
+
+        # Extract and validate input
+        blood_request_id = data.get('blood_request_id')
+        donor_name = data.get('donor_name', '').strip()
+        donor_phone = data.get('donor_phone', '').strip()
+        donor_blood_group = data.get('donor_blood_group', '').strip()
+        note = data.get('note', '').strip()
+
+        # Validation
+        if not blood_request_id:
+            return JsonResponse({
+                'success': False,
+                'error': 'blood_request_id is required'
+            }, status=400)
+
+        if not donor_name or len(donor_name) < 2:
+            return JsonResponse({
+                'success': False,
+                'error': 'donor_name must be at least 2 characters'
+            }, status=400)
+
+        if not donor_phone or len(donor_phone) < 10:
+            return JsonResponse({
+                'success': False,
+                'error': 'donor_phone must be at least 10 characters'
+            }, status=400)
+
+        # Validate blood group
+        valid_blood_groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+        if donor_blood_group not in valid_blood_groups:
+            return JsonResponse({
+                'success': False,
+                'error': f'donor_blood_group must be one of: {", ".join(valid_blood_groups)}'
+            }, status=400)
+
+        # Validate blood group matches request
+        blood_request = BloodRequest.objects.filter(id=blood_request_id, is_active=True).first()
+        if not blood_request:
+            return JsonResponse({
+                'success': False,
+                'error': 'Blood request not found or inactive'
+            }, status=404)
+
+        if donor_blood_group != blood_request.blood_group:
+            return JsonResponse({
+                'success': False,
+                'error': f'Your blood group ({donor_blood_group}) does not match the required blood group ({blood_request.blood_group})'
+            }, status=400)
+
+        # Check if request is already fulfilled
+        if blood_request.units_pledged >= blood_request.units_needed:
+            return JsonResponse({
+                'success': False,
+                'error': 'This blood request has already been fulfilled'
+            }, status=400)
+
+        # Check if request has expired
+        if blood_request.expires_at and blood_request.expires_at < timezone.now():
+            return JsonResponse({
+                'success': False,
+                'error': 'This blood request has expired'
+            }, status=400)
+
+        # Check for duplicate pledge (same phone number)
+        existing_pledge = DonorResponse.objects.filter(
+            blood_request=blood_request,
+            note__icontains=donor_phone  # Store phone in note for external pledges
+        ).first()
+
+        if existing_pledge:
+            return JsonResponse({
+                'success': False,
+                'error': 'You have already pledged to this request'
+            }, status=400)
+
+        # Create DonorResponse (donor=null for external pledges)
+        pledge = DonorResponse.objects.create(
+            blood_request=blood_request,
+            donor=None,  # External pledge - no user account
+            units_pledged=1,
+            note=f"{note}\n\nPhone: {donor_phone}" if note else f"Phone: {donor_phone}",
+            status='pledged'
+        )
+
+        # Update blood request progress
+        blood_request.units_pledged = F('units_pledged') + 1
+        blood_request.responders_count = F('responders_count') + 1
+        blood_request.save()
+
+        # Refresh to get updated values
+        blood_request.refresh_from_db()
+
+        # Update status if fulfilled
+        if blood_request.units_pledged >= blood_request.units_needed:
+            blood_request.status = 'partial' if blood_request.units_received > 0 else 'fulfilled'
+            blood_request.save()
+
+        # Send notification to patient (in-app notification)
+        if blood_request.requested_by:
+            try:
+                from notifications.models import Notification
+
+                # Create in-app notification
+                Notification.objects.create(
+                    user=blood_request.requested_by,
+                    title='🎉 New External Pledge Received!',
+                    message=f'{donor_name} has pledged to donate {donor_blood_group} blood for {blood_request.patient_name}. Contact: {donor_phone}',
+                    type='external_pledge',
+                    related_request_id=blood_request.id,
+                )
+                logger.info(f"In-app notification created for patient {blood_request.requested_by.id}")
+
+                # Try FCM notification if configured
+                send_push_notification(
+                    user_id=blood_request.requested_by.id,
+                    title='🎉 New External Pledge Received!',
+                    body=f'{donor_name} has pledged to donate {donor_blood_group} blood.',
+                    data={
+                        'type': 'external_pledge',
+                        'related_request_id': str(blood_request.id),
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send notification: {str(e)}")
+
+        logger.info(f"External pledge created: pledge_id={pledge.id}, blood_request={blood_request_id}")
+
+        return JsonResponse({
+            'success': True,
+            'message': 'Pledge created successfully',
+            'data': {
+                'pledge_id': str(pledge.id),
+                'units_pledged': pledge.units_pledged,
+                'blood_request_units_pledged': blood_request.units_pledged,
+                'blood_request_units_needed': blood_request.units_needed,
+            }
+        }, status=201)
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON in request body'
+        }, status=400)
+
+    except Exception as e:
+        logger.error(f"Error creating external pledge: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': 'Failed to create pledge. Please try again.'
+        }, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_request_progress_api(request, share_id):
+    """
+    Public API for blood request progress data.
+
+    GET /api/request-progress/{share_id}/
+
+    Response:
+    {
+        "success": true,
+        "data": {
+            "units_needed": 3,
+            "units_pledged": 2,
+            "units_received": 1,
+            "responders_count": 2,
+            "progress_percent": 66,
+            "status": "partial"
+        }
+    }
+
+    Used for AJAX polling/real-time updates on public page.
+    """
+    try:
+        blood_request = get_object_or_404(
+            BloodRequest,
+            share_id=share_id,
+            is_active=True
+        )
+
+        progress_percent = 0
+        if blood_request.units_needed > 0:
+            progress_percent = min(100, int((blood_request.units_pledged / blood_request.units_needed) * 100))
+
+        return Response({
+            'success': True,
+            'data': {
+                'units_needed': blood_request.units_needed,
+                'units_pledged': blood_request.units_pledged,
+                'units_received': blood_request.units_received,
+                'responders_count': blood_request.responders_count,
+                'progress_percent': progress_percent,
+                'status': blood_request.status,
+                'is_fulfilled': blood_request.units_pledged >= blood_request.units_needed,
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching request progress: {str(e)}", exc_info=True)
+        return Response({
+            'success': False,
+            'error': 'Failed to fetch progress data'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_blood_request_by_share_id(request, share_id):
+    """
+    Fetch blood request by share_id (for app users).
+
+    GET /api/blood-requests/by-share/{share_id}/
+
+    Allows authenticated app users to fetch blood request details
+    using the short share_id instead of the full UUID.
+
+    Response:
+    {
+        "success": true,
+        "data": {
+            "id": "uuid",
+            "share_id": "abc123xy",
+            "patient_name": "John Doe",
+            ...
+        }
+    }
+    """
+    try:
+        blood_request = BloodRequest.objects.filter(
+            share_id=share_id,
+            is_active=True
+        ).first()
+
+        if not blood_request:
+            return Response({
+                'success': False,
+                'message': 'Blood request not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = DetailedBloodRequestSerializer(blood_request)
+
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching blood request by share_id: {str(e)}", exc_info=True)
+        return Response({
+            'success': False,
+            'message': 'Failed to fetch blood request'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

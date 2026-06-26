@@ -6,7 +6,7 @@ import '../theme/app_theme.dart' show AppColors;
 import '../providers/role_provider.dart';
 
 /// Unified Bottom Navigation Bar widget
-/// Used consistently across all screens for: Home, Request, Map, Chat, Profile
+/// Used consistently across all screens for: Home, Request, Chat, Profile
 /// Adapts navigation based on user role (Patient vs Donor)
 class UnifiedBottomNavigationBar extends StatelessWidget {
   final int selectedIndex;
@@ -47,12 +47,6 @@ class UnifiedBottomNavigationBar extends StatelessWidget {
         activeIcon: Icons.bloodtype,
         label: 'Request',
         route: requestsRoute,
-      ),
-      NavItem(
-        icon: Icons.map_outlined,
-        activeIcon: Icons.map,
-        label: 'Map',
-        route: AppRoutes.findDonors,
       ),
       NavItem(
         icon: Icons.chat_bubble_outline,

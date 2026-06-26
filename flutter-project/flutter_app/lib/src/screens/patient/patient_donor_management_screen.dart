@@ -525,15 +525,6 @@ class _PatientDonorManagementScreenState extends State<PatientDonorManagementScr
                 '${pledge.unitsPledged} unit${pledge.unitsPledged > 1 ? 's' : ''} pledged',
                 style: TextStyle(fontSize: 13, color: Colors.grey[700]),
               ),
-              if (pledge.preferredDate != null) ...[
-                const SizedBox(width: 16),
-                Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 6),
-                Text(
-                  pledge.preferredDate!,
-                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-                ),
-              ],
             ],
           ),
 

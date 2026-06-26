@@ -1,0 +1,439 @@
+{% extends "blood_requests/base.html" %}
+
+{% block title %}{{ blood_request.patient_name }} needs {{ blood_request.blood_group }} blood{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1 class="card-title">🩸 Urgent Blood Request</h1>
+    </div>
+
+    <!-- Blood Type Badge & Urgency -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
+        <div class="blood-type-badge">
+            {{ blood_request.blood_group }}
+        </div>
+        <div class="urgency-badge urgency-{{ blood_request.urgency_level }}">
+            {{ blood_request.get_urgency_level_display }}
+        </div>
+    </div>
+
+    <!-- Patient Info -->
+    <div style="margin: 20px 0;">
+        <h2 style="font-family: 'Poppins', sans-serif; font-size: 1.75rem; color: var(--text-dark);">
+            {{ blood_request.patient_name }}
+        </h2>
+        {% if blood_request.hospital_name %}
+        <p style="color: var(--text-light); margin-top: 5px;">
+            🏥 {{ blood_request.hospital_name }}
+        </p>
+        {% endif %}
+        {% if blood_request.location %}
+        <p style="color: var(--text-light);">
+            📍 {{ blood_request.location }}
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-container">
+        <div class="progress-header">
+            <span>Progress</span>
+            <span>{{ blood_request.units_pledged }} / {{ blood_request.units_needed }} units pledged</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ progress_percent }}%">
+                {% if progress_percent > 10 %}
+                    {{ progress_percent }}%
+                {% endif %}
+            </div>
+        </div>
+        <p style="text-align: center; margin-top: 10px; color: var(--text-light); font-size: 0.9rem;">
+            {% if is_fulfilled %}
+                ✅ Request is fulfilled! Thank you to all donors.
+            {% else %}
+                🙏 {{ units_remaining }} more unit{{ units_remaining|pluralize:"s" }} needed
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Request Details Grid -->
+    <div class="info-grid">
+        <div class="info-item">
+            <span class="info-icon">🩸</span>
+            <div class="info-content">
+                <div class="info-label">Blood Group</div>
+                <div class="info-value">{{ blood_request.blood_group }}</div>
+            </div>
+        </div>
+        <div class="info-item">
+            <span class="info-icon">📊</span>
+            <div class="info-content">
+                <div class="info-label">Units Needed</div>
+                <div class="info-value">{{ blood_request.units_needed }}</div>
+            </div>
+        </div>
+        <div class="info-item">
+            <span class="info-icon">👥</span>
+            <div class="info-content">
+                <div class="info-label">Donors Pledged</div>
+                <div class="info-value">{{ responders_count }}</div>
+            </div>
+        </div>
+        {% if time_remaining %}
+        <div class="info-item">
+            <span class="info-icon">⏰</span>
+            <div class="info-content">
+                <div class="info-label">Time Remaining</div>
+                <div class="info-value">{{ time_remaining }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if not is_fulfilled %}
+    <!-- Pledge Form -->
+    <div id="pledge-form-container" style="margin-top: 30px; padding-top: 30px; border-top: 2px solid var(--bg-light);">
+        <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.5rem; margin-bottom: 20px;">
+            Pledge Your Donation
+        </h3>
+
+        <div id="form-alerts"></div>
+
+        <form id="pledge-form">
+            <div class="form-group">
+                <label class="form-label" for="donor_name">Your Name *</label>
+                <input
+                    type="text"
+                    id="donor_name"
+                    name="donor_name"
+                    class="form-control"
+                    placeholder="Enter your full name"
+                    required
+                    minlength="2"
+                >
+                <div class="error-message" id="donor_name_error"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="donor_phone">Phone Number *</label>
+                <input
+                    type="tel"
+                    id="donor_phone"
+                    name="donor_phone"
+                    class="form-control"
+                    placeholder="+1234567890"
+                    required
+                    minlength="10"
+                >
+                <div class="form-text">Will be shared with the patient so they can contact you</div>
+                <div class="error-message" id="donor_phone_error"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Blood Group *</label>
+                <div class="blood-group-options">
+                    <div class="blood-group-option">
+                        <input
+                            type="radio"
+                            id="blood_a_plus"
+                            name="donor_blood_group"
+                            value="A+"
+                            {% if blood_request.blood_group == 'A+' %}checked{% endif %}
+                            required
+                        >
+                        <label for="blood_a_plus">A+</label>
+                    </div>
+                    <div class="blood-group-option">
+                        <input
+                            type="radio"
+                            id="blood_a_minus"
+                            name="donor_blood_group"
+                            value="A-"
+                            {% if blood_request.blood_group == 'A-' %}checked{% endif %}
+                            required
+                        >
+                        <label for="blood_a_minus">A-</label>
+                    </div>
+                    <div class="blood-group-option">
+                        <input
+                            type="radio"
+                            id="blood_b_plus"
+                            name="donor_blood_group"
+                            value="B+"
+                            {% if blood_request.blood_group == 'B+' %}checked{% endif %}
+                            required
+                        >
+                        <label for="blood_b_plus">B+</label>
+                    </div>
+                    <div class="blood-group-option">
+                        <input
+                            type="radio"
+                            id="blood_b_minus"
+                            name="donor_blood_group"
+                            value="B-"
+                            {% if blood_request.blood_group == 'B-' %}checked{% endif %}
+                            required
+                        >
+                        <label for="blood_b_minus">B-</label>
+                    </div>
+                    <div class="blood-group-option">
+                        <input
+                            type="radio"
+                            id="blood_ab_plus"
+                            name="donor_blood_group"
+                            value="AB+"
+                            {% if blood_request.blood_group == 'AB+' %}checked{% endif %}
+                            required
+                        >
+                        <label for="blood_ab_plus">AB+</label>
+                    </div>
+                    <div class="blood-group-option">
+                        <input
+                            type="radio"
+                            id="blood_ab_minus"
+                            name="donor_blood_group"
+                            value="AB-"
+                            {% if blood_request.blood_group == 'AB-' %}checked{% endif %}
+                            required
+                        >
+                        <label for="blood_ab_minus">AB-</label>
+                    </div>
+                    <div class="blood-group-option">
+                        <input
+                            type="radio"
+                            id="blood_o_plus"
+                            name="donor_blood_group"
+                            value="O+"
+                            {% if blood_request.blood_group == 'O+' %}checked{% endif %}
+                            required
+                        >
+                        <label for="blood_o_plus">O+</label>
+                    </div>
+                    <div class="blood-group-option">
+                        <input
+                            type="radio"
+                            id="blood_o_minus"
+                            name="donor_blood_group"
+                            value="O-"
+                            {% if blood_request.blood_group == 'O-' %}checked{% endif %}
+                            required
+                        >
+                        <label for="blood_o_minus">O-</label>
+                    </div>
+                </div>
+                <div class="error-message" id="donor_blood_group_error"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="note">Note (Optional)</label>
+                <textarea
+                    id="note"
+                    name="note"
+                    class="form-control"
+                    rows="3"
+                    placeholder="Add a note for the patient (e.g., 'I can donate in the morning')"
+                    maxlength="500"
+                ></textarea>
+                <div class="form-text">Share any additional information with the patient</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
+                <span id="btn-text">💝 Pledge to Donate</span>
+                <span id="btn-spinner" class="spinner" style="display: none;"></span>
+            </button>
+        </form>
+    </div>
+
+    <!-- Privacy Notice -->
+    <div class="privacy-notice">
+        <p>
+            🔒 <strong>Privacy:</strong> Your phone number will only be shared with the patient so they can contact you about the donation. Other personal information is kept private.
+        </p>
+    </div>
+    {% else %}
+    <!-- Fulfilled Message -->
+    <div class="alert alert-success" style="margin-top: 30px;">
+        <h3 style="margin-bottom: 10px;">🎉 Request Fulfilled!</h3>
+        <p>Thank you to everyone who pledged. This blood request has received enough pledges.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Donation Information -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.25rem;">Before You Donate</h3>
+    </div>
+    <ul style="padding-left: 20px; line-height: 2;">
+        <li>Ensure you're in good health</li>
+        <li>Have not donated blood in the last 56 days</li>
+        <li>Weigh at least 50 kg (110 lbs)</li>
+        <li>Are between 18-65 years old</li>
+        <li>Have not had a tattoo or piercing in the last 6 months</li>
+    </ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Form validation and submission
+const form = document.getElementById('pledge-form');
+const submitBtn = document.getElementById('submit-btn');
+const btnText = document.getElementById('btn-text');
+const btnSpinner = document.getElementById('btn-spinner');
+const formAlerts = document.getElementById('form-alerts');
+
+// Blood request ID for API calls
+const BLOOD_REQUEST_ID = '{{ blood_request.id }}';
+
+function showAlert(message, type = 'success') {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+    formAlerts.innerHTML = `
+        <div class="alert ${alertClass}">
+            ${message}
+        </div>
+    `;
+    setTimeout(() => {
+        formAlerts.innerHTML = '';
+    }, 5000);
+}
+
+function showError(fieldId, message) {
+    const field = document.getElementById(fieldId);
+    const errorDiv = document.getElementById(fieldId + '_error');
+    field.classList.add('error');
+    errorDiv.textContent = message;
+    errorDiv.classList.add('show');
+}
+
+function clearError(fieldId) {
+    const field = document.getElementById(fieldId);
+    const errorDiv = document.getElementById(fieldId + '_error');
+    field.classList.remove('error');
+    errorDiv.classList.remove('show');
+}
+
+function clearAllErrors() {
+    ['donor_name', 'donor_phone'].forEach(clearError);
+}
+
+function setSubmitting(isSubmitting) {
+    submitBtn.disabled = isSubmitting;
+    if (isSubmitting) {
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline-block';
+    } else {
+        btnText.style.display = 'inline';
+        btnSpinner.style.display = 'none';
+    }
+}
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearAllErrors();
+
+    // Get form values
+    const donorName = document.getElementById('donor_name').value.trim();
+    const donorPhone = document.getElementById('donor_phone').value.trim();
+    const donorBloodGroup = document.querySelector('input[name="donor_blood_group"]:checked')?.value;
+    const note = document.getElementById('note').value.trim();
+
+    // Client-side validation
+    let hasError = false;
+
+    if (donorName.length < 2) {
+        showError('donor_name', 'Name must be at least 2 characters');
+        hasError = true;
+    }
+
+    if (donorPhone.length < 10) {
+        showError('donor_phone', 'Phone number must be at least 10 characters');
+        hasError = true;
+    }
+
+    if (!donorBloodGroup) {
+        document.getElementById('donor_blood_group_error').textContent = 'Please select your blood group';
+        document.getElementById('donor_blood_group_error').classList.add('show');
+        hasError = true;
+    }
+
+    if (hasError) {
+        showAlert('Please fix the errors above', 'error');
+        return;
+    }
+
+    // Submit to API
+    setSubmitting(true);
+
+    try {
+        const response = await fetch('/api/external-pledge/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                blood_request_id: BLOOD_REQUEST_ID,
+                donor_name: donorName,
+                donor_phone: donorPhone,
+                donor_blood_group: donorBloodGroup,
+                note: note
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Success!
+            showAlert('✅ Your pledge has been submitted! Thank you for helping save a life.', 'success');
+            form.reset();
+
+            // Update progress bar
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        } else {
+            // Error
+            showAlert('❌ ' + (data.error || 'Failed to submit pledge. Please try again.'), 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showAlert('❌ Network error. Please check your connection and try again.', 'error');
+    } finally {
+        setSubmitting(false);
+    }
+});
+
+// Real-time progress updates (poll every 10 seconds)
+if (!{{ is_fulfilled|lower }}) {
+    setInterval(async () => {
+        try {
+            const response = await fetch(`/api/request-progress/{{ share_id }}/`);
+            const data = await response.json();
+
+            if (data.success) {
+                const progressFill = document.querySelector('.progress-fill');
+                const progressPercent = data.data.progress_percent;
+                const unitsPledged = data.data.units_pledged;
+
+                progressFill.style.width = progressPercent + '%';
+                if (progressPercent > 10) {
+                    progressFill.textContent = progressPercent + '%';
+                }
+
+                // Update text
+                document.querySelector('.progress-header span:last-child').textContent =
+                    `${unitsPledged} / {{ blood_request.units_needed }} units pledged`;
+
+                // If fulfilled, reload page
+                if (data.data.is_fulfilled) {
+                    location.reload();
+                }
+            }
+        } catch (error) {
+            console.error('Progress update error:', error);
+        }
+    }, 10000);
+}
+</script>
+{% endblock %}

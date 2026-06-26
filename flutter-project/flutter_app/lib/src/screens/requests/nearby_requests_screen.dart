@@ -882,9 +882,17 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
       if (request.locationLng! > maxLng) maxLng = request.locationLng!;
     }
 
-    // Include donor's GPS location in bounds if available
+    // Include donor's location in bounds (prioritize profile location, fallback to GPS)
     LatLng? donorLocation;
-    if (_userPosition != null) {
+    if (_donorProfileLat != null && _donorProfileLng != null) {
+      // Use profile location from database as primary source
+      donorLocation = LatLng(_donorProfileLat!, _donorProfileLng!);
+      minLat = min(minLat, donorLocation.latitude);
+      maxLat = max(maxLat, donorLocation.latitude);
+      minLng = min(minLng, donorLocation.longitude);
+      maxLng = max(maxLng, donorLocation.longitude);
+    } else if (_userPosition != null) {
+      // Fallback to GPS location if no profile location
       donorLocation = LatLng(_userPosition!.latitude, _userPosition!.longitude);
       minLat = min(minLat, donorLocation.latitude);
       maxLat = max(maxLat, donorLocation.latitude);
@@ -918,50 +926,74 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
     final List<Marker> allMarkers = [];
     allMarkers.addAll(_buildBloodRequestMarkers(requestsWithLocation));
 
-    // Add donor's GPS location marker if available
+    // Add donor's location marker (profile location or GPS fallback)
     if (donorLocation != null) {
       allMarkers.add(
         Marker(
           point: donorLocation,
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.blue,
+              color: Colors.green,
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 3),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 4,
+                  blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 20,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                Positioned(
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green, width: 1),
+                    ),
+                    child: const Text(
+                      'YOU',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       );
     }
 
-    // Build blue route polylines from donor to each request
+    // Build route polylines from donor to each request
     final List<Polyline> routePolylines = [];
 
     if (donorLocation != null) {
       for (final request in requestsWithLocation) {
         final requestLocation = LatLng(request.locationLat!, request.locationLng!);
 
-        // Create solid blue polyline from donor to request
+        // Create green polyline from donor to request
         routePolylines.add(
           Polyline(
             points: [donorLocation, requestLocation],
-            strokeWidth: 5,
-            color: Colors.blue.withValues(alpha: 0.7),
-            borderStrokeWidth: 2,
+            strokeWidth: 3,
+            color: Colors.green.withValues(alpha: 0.6),
+            borderStrokeWidth: 1,
             borderColor: Colors.white,
           ),
         );

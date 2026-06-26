@@ -42,6 +42,17 @@ class BloodRequest(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # External pledge system: Short shareable ID for public links
+    share_id = models.CharField(
+        max_length=12,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Short shareable ID for external sharing (e.g., abc123xy)"
+    )
+
     patient_name = models.CharField(
         max_length=255,
         help_text="Name of the patient requiring blood"
@@ -74,6 +85,12 @@ class BloodRequest(models.Model):
         blank=True,
         null=True,
         help_text="Additional notes or medical information (optional)"
+    )
+    # Quiz responses for patient assessment
+    quiz_responses = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Patient's quiz responses as JSON data"
     )
     hospital_name = models.CharField(
         max_length=255,
@@ -207,6 +224,8 @@ class BloodRequest(models.Model):
             models.Index(fields=['location_lat', 'location_lng']),
             models.Index(fields=['expires_at']),
             models.Index(fields=['-urgency_level', '-created_at']),
+            # External pledge system: share_id index for fast lookups
+            models.Index(fields=['share_id']),
         ]
 
     def __str__(self):
@@ -221,6 +240,32 @@ class BloodRequest(models.Model):
     def units_remaining(self):
         """Calculate units remaining to fulfill the request"""
         return max(0, self.units_needed - self.units_pledged)
+
+    def save(self, *args, **kwargs):
+        """Override save to generate share_id on first save"""
+        # Generate share_id on first save if not set
+        if not self.share_id:
+            self.share_id = self._generate_share_id()
+        super().save(*args, **kwargs)
+
+    def _generate_share_id(self):
+        """Generate a unique 8-character share ID for public sharing"""
+        import secrets
+        import string
+        alphabet = string.ascii_lowercase + string.digits
+
+        # Generate a candidate share_id until we find a unique one
+        max_attempts = 100
+        for _ in range(max_attempts):
+            candidate = ''.join(secrets.choice(alphabet) for _ in range(8))
+            # Check if this share_id already exists
+            if not BloodRequest.objects.filter(share_id=candidate).exists():
+                return candidate
+
+        # Fallback to UUID-based share_id if all attempts fail
+        import hashlib
+        hash_object = hashlib.md5(str(uuid.uuid4()).encode())
+        return hash_object.hexdigest()[:8]
 
 
 class DonorResponse(models.Model):
@@ -277,11 +322,6 @@ class DonorResponse(models.Model):
     units_received = models.PositiveIntegerField(
         default=0,
         help_text="Number of units actually received"
-    )
-    preferred_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="Preferred donation date"
     )
     note = models.TextField(
         blank=True,
@@ -435,3 +475,90 @@ class DonorResponse(models.Model):
         """Days since pledge was created"""
         from django.utils import timezone
         return (timezone.now() - self.created_at).days
+
+
+class PatientQuiz(models.Model):
+    """
+    Patient medical quiz responses for blood requests.
+    Stores structured answers to medical history questions.
+    """
+
+    QUIZ_QUESTIONS = [
+        ('had_blood_transfusion', 'Has the patient had a blood transfusion in the last 3 months?'),
+        ('had_tattoo_piercing', 'Has the patient had any tattoos or piercings in the last 6 months?'),
+        ('had_surgery', 'Has the patient had any major surgery in the last 6 months?'),
+        ('on_medication', 'Is the patient currently on any medication?'),
+        ('has_chronic_disease', 'Does the patient have any chronic diseases (diabetes, hypertension, etc.)?'),
+        ('traveled_malaria_area', 'Has the patient traveled to any malaria-prone areas in the last 12 months?'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    blood_request = models.OneToOneField(
+        BloodRequest,
+        on_delete=models.CASCADE,
+        related_name='patient_quiz',
+        help_text="Associated blood request"
+    )
+
+    # Quiz responses
+    had_blood_transfusion = models.BooleanField(
+        default=False,
+        help_text="Had blood transfusion in last 3 months"
+    )
+    had_tattoo_piercing = models.BooleanField(
+        default=False,
+        help_text="Had tattoos or piercings in last 6 months"
+    )
+    had_surgery = models.BooleanField(
+        default=False,
+        help_text="Had major surgery in last 6 months"
+    )
+    on_medication = models.BooleanField(
+        default=False,
+        help_text="Currently on medication"
+    )
+    has_chronic_disease = models.BooleanField(
+        default=False,
+        help_text="Has chronic diseases"
+    )
+    traveled_malaria_area = models.BooleanField(
+        default=False,
+        help_text="Traveled to malaria-prone areas in last 12 months"
+    )
+
+    # Additional medical information
+    other_medical_info = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Additional medical information provided by patient"
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Patient Quiz"
+        verbose_name_plural = "Patient Quizzes"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Quiz for {self.blood_request.patient_name}"
+
+    def get_quiz_summary(self):
+        """Get a summary of quiz responses for quick viewing"""
+        positive_responses = []
+        if self.had_blood_transfusion:
+            positive_responses.append("Blood transfusion")
+        if self.had_tattoo_piercing:
+            positive_responses.append("Tattoos/piercings")
+        if self.had_surgery:
+            positive_responses.append("Recent surgery")
+        if self.on_medication:
+            positive_responses.append("On medication")
+        if self.has_chronic_disease:
+            positive_responses.append("Chronic disease")
+        if self.traveled_malaria_area:
+            positive_responses.append("Malaria area travel")
+
+        return positive_responses if positive_responses else ["No risk factors"]

@@ -291,7 +291,7 @@ class _NearbyDonorsMapScreenState extends State<NearbyDonorsMapScreen> {
       );
     }
 
-    // Add markers for nearby donors
+    // Add markers for nearby donors with enhanced info
     for (int i = 0; i < _nearbyDonors.length; i++) {
       final donor = _nearbyDonors[i];
 
@@ -299,38 +299,84 @@ class _NearbyDonorsMapScreenState extends State<NearbyDonorsMapScreen> {
       if (donor['location_lat'] != null && donor['location_lng'] != null) {
         final donorLat = donor['location_lat'] as num;
         final donorLng = donor['location_lng'] as num;
+        final bloodGroup = donor['blood_group']?.toString() ?? 'N/A';
+        final distance = donor['distance_km'] ?? 0.0;
 
-        // Create marker
+        // Create enhanced marker with blood group and distance
         _markers.add(
           Marker(
-            width: 40,
-            height: 40,
+            width: 80,
+            height: 80,
             point: LatLng(donorLat.toDouble(), donorLng.toDouble()),
             child: GestureDetector(
               onTap: () => _showDonorDetails(donor),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Main marker circle
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.red,
                       shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                  // Blood group text
+                  Positioned(
+                    top: 18,
+                    child: Text(
+                      bloodGroup,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black45,
+                            blurRadius: 2,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Distance badge below marker
+                  Positioned(
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.red, width: 1),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        distance < 1
+                            ? '${(distance * 1000).toInt()}m'
+                            : '${distance.toStringAsFixed(1)}km',
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -624,19 +670,52 @@ class _NearbyDonorsMapScreenState extends State<NearbyDonorsMapScreen> {
                 Row(
                   children: [
                     Container(
-                      width: 20,
-                      height: 20,
+                      width: 24,
+                      height: 24,
                       decoration: BoxDecoration(
-                        color: Colors.green,
+                        color: Colors.red,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),
                       child: const Center(
-                        child: Icon(Icons.circle, color: Colors.white, size: 8),
+                        child: Text(
+                          'A+',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text('Nearby Donor'),
+                    const Text('Blood Donor (Blood Group)'),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.red, width: 1),
+                      ),
+                      child: const Text(
+                        '2.5km',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 7,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Distance from you',
+                      style: TextStyle(fontSize: 11),
+                    ),
                   ],
                 ),
               ],

@@ -445,6 +445,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   : _buildBody(roleProvider),
             ),
             bottomNavigationBar: _buildBottomNavigation(roleProvider),
+            floatingActionButton: _buildAIHelpButton(),
+            floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           ),
         );
       },
@@ -1175,21 +1177,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       displayNote = displayNote.substring(0, displayNote.length - 2);
     }
 
-    // Format preferred date if available
-    String formattedDate = '';
-    if (pledge['preferred_date'] != null) {
+    // Use preferred time if available (from note), otherwise use pledge created date
+    String formattedDate = preferredDateTime ?? '';
+
+    // If no preferred time found, show pledge date/time instead
+    if (formattedDate.isEmpty && pledge['created_at'] != null) {
       try {
-        final dateStr = pledge['preferred_date'] as String;
-        final date = DateTime.parse(dateStr);
-        formattedDate = '${date.day}/${date.month}/${date.year}';
-        if (preferredDateTime != null) {
-          formattedDate += ' at $preferredDateTime';
+        final createdAt = DateTime.parse(pledge['created_at'] as String);
+        final now = DateTime.now();
+        final difference = now.difference(createdAt);
+
+        // Format as relative time (e.g., "2 hours ago")
+        if (difference.inMinutes < 60) {
+          formattedDate = '${difference.inMinutes} min ago';
+        } else if (difference.inHours < 24) {
+          formattedDate = '${difference.inHours} hours ago';
+        } else if (difference.inDays < 7) {
+          formattedDate = '${difference.inDays} days ago';
+        } else {
+          formattedDate = '${createdAt.day}/${createdAt.month}/${createdAt.year}';
         }
       } catch (e) {
-        formattedDate = pledge['preferred_date'] as String? ?? '';
+        formattedDate = 'Unknown';
       }
-    } else if (preferredDateTime != null) {
-      formattedDate = preferredDateTime;
     }
 
     return Padding(
@@ -1305,13 +1315,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Preferred: $formattedDate',
+                      preferredDateTime != null ? 'Preferred: $formattedDate' : 'Pledged: $formattedDate',
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    const Spacer(),
+                    // Show units pledged (blood pint)
+                    if (pledge['units_pledged'] != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.red.shade200, width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bloodtype, size: 14, color: Colors.red.shade700),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${pledge['units_pledged']} unit${pledge['units_pledged'] == 1 ? '' : 's'}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.red.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -1854,20 +1890,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
           const SizedBox(width: 12),
           _QuickActionButton(
-            key: const ValueKey('action_requests'),
-            title: 'Requests',
-            icon: Icons.location_on,
-            onTap: () => Navigator.pushNamed(context, AppRoutes.nearbyRequests),
-          ),
-          const SizedBox(width: 12),
-          _QuickActionButton(
-            key: const ValueKey('action_ai_help'),
-            title: 'AI Help',
-            icon: Icons.smart_toy_outlined,
-            onTap: () => Navigator.pushNamed(context, AppRoutes.aiChatbot),
-          ),
-          const SizedBox(width: 12),
-          _QuickActionButton(
             key: const ValueKey('action_chat'),
             title: 'Chat',
             icon: Icons.message,
@@ -1893,12 +1915,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             title: 'Chat',
             icon: Icons.message,
             onTap: () => Navigator.pushNamed(context, AppRoutes.messages),
-          ),
-          const SizedBox(width: 12),
-          _QuickActionButton(
-            title: 'AI Help',
-            icon: Icons.smart_toy_outlined,
-            onTap: () => Navigator.pushNamed(context, AppRoutes.aiChatbot),
           ),
           const SizedBox(width: 12),
           _QuickActionButton(
@@ -2021,6 +2037,50 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
+  Widget _buildAIHelpButton() {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.primary,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Navigator.pushNamed(context, AppRoutes.aiChatbot),
+          customBorder: const CircleBorder(),
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.smart_toy_outlined,
+                color: Colors.white,
+                size: 24,
+              ),
+              SizedBox(height: 2),
+              Text(
+                'AI Help',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomNavigation(RoleProvider roleProvider) {
     // Determine current route index based on role
     int getCurrentIndex() {
@@ -2040,14 +2100,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         case AppRoutes.myRequests:
           // Patients use my requests (index 1)
           return 1;
-        case AppRoutes.findDonors:
-          return 2;
         case AppRoutes.messages:
-          return 3;
+          return 2;
         case AppRoutes.chatList:
-          return 3;
+          return 2;
         case AppRoutes.settings:
-          return 4;
+          return 3;
         default:
           return 0;
       }
@@ -2070,13 +2128,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           case 1: // Requests
             Navigator.pushReplacementNamed(context, getRequestsRoute());
             break;
-          case 2: // Map
-            Navigator.pushReplacementNamed(context, AppRoutes.findDonors);
-            break;
-          case 3: // Chat/Messages
+          case 2: // Chat/Messages
             Navigator.pushReplacementNamed(context, AppRoutes.messages);
             break;
-          case 4: // Profile/Settings
+          case 3: // Profile/Settings
             Navigator.pushReplacementNamed(context, AppRoutes.settings);
             break;
         }

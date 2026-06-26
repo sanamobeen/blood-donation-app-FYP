@@ -46,6 +46,16 @@ urlpatterns = [
 
     # Phase 7: Pre-donation verification
     path('pledges/<uuid:pledge_id>/verify/', views.verify_pledge, name='verify_pledge'),
+
+    # External Pledge System (Web-based public sharing)
+    path('by-share/<str:share_id>/', views.get_blood_request_by_share_id, name='get_by_share_id'),
+]
+
+# Public web page URLs (served at root level, not under /api/)
+public_urlpatterns = [
+    path('request/<str:share_id>/', views.public_blood_request_page, name='public_request_page'),
+    path('api/external-pledge/', views.create_external_pledge, name='external_pledge_api'),
+    path('api/request-progress/<str:share_id>/', views.public_request_progress_api, name='request_progress_api'),
 ]
 
 # Admin URLs - imported in backend/urls.py

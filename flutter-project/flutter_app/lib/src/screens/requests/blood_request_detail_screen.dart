@@ -1,4 +1,6 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart'; // External pledge system: Share functionality
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../services/firebase_chat_service.dart';
@@ -42,6 +44,11 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
   int _cooldownDaysRemaining = 0;
   String? _currentUserId;
 
+  // Current user's profile location (for donors viewing the request)
+  double? _currentUserLat;
+  double? _currentUserLng;
+  String? _currentUserBloodGroup;
+
   @override
   void initState() {
     super.initState();
@@ -75,7 +82,59 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
     return _currentUserId == _request!.requestedById;
   }
 
+  /// Load current user's profile location and blood group
+  Future<void> _loadCurrentUserProfile() async {
+    try {
+      final profileResponse = await ApiService.getProfile();
+      if (profileResponse['success'] == true && profileResponse['data'] != null) {
+        final data = profileResponse['data'];
+        final profile = data['profile'];
+
+        if (profile != null) {
+          setState(() {
+            if (profile['location_lat'] != null && profile['location_lng'] != null) {
+              _currentUserLat = double.tryParse(profile['location_lat'].toString());
+              _currentUserLng = double.tryParse(profile['location_lng'].toString());
+            }
+            if (profile['blood_group'] != null) {
+              _currentUserBloodGroup = profile['blood_group'].toString();
+            }
+          });
+          print('📍 Loaded user profile location: $_currentUserLat, $_currentUserLng');
+          print('🩸 Loaded user blood group: $_currentUserBloodGroup');
+        }
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
+    }
+  }
+
+  /// Calculate distance between two locations in km using Haversine formula
+  double? _calculateDistance() {
+    if (_currentUserLat == null || _currentUserLng == null) return null;
+    if (_request?.locationLat == null || _request?.locationLng == null) return null;
+
+    final patientLat = double.tryParse(_request!.locationLat.toString());
+    final patientLng = double.tryParse(_request!.locationLng.toString());
+    if (patientLat == null || patientLng == null) return null;
+
+    const double earthRadius = 6371; // km
+    double dLat = _toRadians(patientLat - _currentUserLat!);
+    double dLng = _toRadians(patientLng - _currentUserLng!);
+    double a = (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(_toRadians(_currentUserLat!)) * cos(_toRadians(patientLat)) *
+        (sin(dLng / 2) * sin(dLng / 2));
+    double c = 2 * asin(sqrt(a));
+    return earthRadius * c;
+  }
+
+  double _toRadians(double degrees) {
+    return degrees * 3.14159265359 / 180;
+  }
+
   Future<void> _loadRequestDetail() async {
+    print('🐛 [_loadRequestDetail] Loading request detail for ID: ${widget.requestId}');
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -84,16 +143,31 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
     try {
       final response = await ApiService.getBloodRequestDetail(widget.requestId);
 
+      print('🐛 [_loadRequestDetail] API response success: ${response.success}');
+      print('🐛 [_loadRequestDetail] API response message: ${response.message}');
+
+      if (response.bloodRequest != null) {
+        print('🐛 [_loadRequestDetail] BloodRequest loaded');
+        print('🐛 [_loadRequestDetail] BloodRequest.shareId: ${response.bloodRequest!.shareId}');
+        print('🐛 [_loadRequestDetail] BloodRequest.id: ${response.bloodRequest!.id}');
+      } else {
+        print('🐛 [_loadRequestDetail] ERROR: BloodRequest is null!');
+      }
+
       if (mounted) {
         setState(() {
           if (response.success && response.bloodRequest != null) {
             _request = response.bloodRequest;
+            print('🐛 [_loadRequestDetail] _request assigned successfully');
           } else {
             _errorMessage = response.message;
           }
           _isLoading = false;
         });
       }
+
+      // Load current user's profile location
+      await _loadCurrentUserProfile();
 
       // Load data based on user role
       if (_isRequestCreator()) {
@@ -105,6 +179,7 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
         _checkDonorEligibility();
       }
     } catch (e) {
+      print('🐛 [_loadRequestDetail] EXCEPTION: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -804,7 +879,7 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Donor Map - Show only to patient when there are pledged donors
+          // Donor Map - Show to patients with pledged donors OR to donors viewing the request
           if (_isRequestCreator() && _pledges.isNotEmpty) ...[
             const Text(
               'Donor Locations',
@@ -886,6 +961,111 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
                   Expanded(
                     child: Text(
                       'Tap on donor markers to view details',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+
+          // Location Map for Donors - Show patient location, donor location, and distance
+          if (!_isRequestCreator() && _request!.locationLat != null && _request!.locationLng != null) ...[
+            const Text(
+              'Location',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Distance card
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: const Icon(
+                      Icons.location_on,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Distance to Patient',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _calculateDistance() != null
+                              ? '${_calculateDistance()!.toStringAsFixed(1)} km'
+                              : 'Unknown',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Map showing both locations
+            DonorMapView(
+              patientLat: _request!.locationLat != null
+                  ? double.tryParse(_request!.locationLat.toString())
+                  : null,
+              patientLng: _request!.locationLng != null
+                  ? double.tryParse(_request!.locationLng.toString())
+                  : null,
+              currentUserLat: _currentUserLat,
+              currentUserLng: _currentUserLng,
+              distanceKm: _calculateDistance(),
+              donors: [], // No donor markers needed for this view
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Green marker: Your location | Red marker: Patient location',
                       style: TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -1145,14 +1325,71 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
     }
   }
 
-  void _shareRequest() {
-    // TODO: Implement share functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Share functionality coming soon'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  void _shareRequest() async {
+    // External pledge system: Share blood request link
+    print('🐛 [_shareRequest] Share button pressed');
+    print('🐛 [_shareRequest] _request is null: ${_request == null}');
+
+    if (_request == null) {
+      print('🐛 [_shareRequest] ERROR: _request is null, cannot share!');
+      return;
+    }
+
+    final request = _request!;
+
+    print('🐛 [_shareRequest] ===== DEBUGGING SHARE ID =====');
+    print('🐛 [_shareRequest] request.shareId: ${request.shareId}');
+    print('🐛 [_shareRequest] request.shareId type: ${request.shareId.runtimeType}');
+    print('🐛 [_shareRequest] request.shareId == null: ${request.shareId == null}');
+    print('🐛 [_shareRequest] request.id: ${request.id}');
+    print('🐛 [_shareRequest] request.id type: ${request.id.runtimeType}');
+
+    // Generate share link using share_id or fall back to id
+    // For production: 'https://yourdomain.com/request'
+    // For local testing with ngrok: 'https://6411-103-150-239-29.ngrok-free.app/request'
+    final baseUrl = 'https://6411-103-150-239-29.ngrok-free.app/request';
+
+    final shareId = request.shareId ?? request.id;
+    print('🐛 [_shareRequest] Selected shareId: $shareId');
+    print('🐛 [_shareRequest] Using share_id: ${request.shareId != null ? 'YES ✅' : 'NO ❌ (using id instead)'}');
+
+    final shareUrl = '$baseUrl/$shareId';
+    print('🐛 [_shareRequest] Final share URL: $shareUrl');
+    print('🐛 [_shareRequest] ===== END DEBUGGING =====');
+
+    // Create formatted share message
+    // URL at very end with no hashtags after it for better WhatsApp recognition
+    final shareMessage = '''
+🩸 *Urgent Blood Request Needed!*
+
+👤 Patient: ${request.patientName}
+🩸 Blood Group: ${request.bloodGroup}
+📊 Units Needed: ${request.unitsNeeded}
+⚠️ Urgency: ${request.urgencyLevel.toUpperCase()}
+🏥 Hospital: ${request.hospitalName ?? 'Not specified'}
+📍 Location: ${request.location ?? 'Not specified'}
+
+Help save a life! View details and pledge at:
+$shareUrl''';
+
+    try {
+      await Share.share(
+        shareMessage,
+        subject: 'Urgent Blood Request - ${request.patientName}',
+      );
+      print('🐛 [_shareRequest] Share successful!');
+    } catch (e) {
+      print('🐛 [_shareRequest] Share error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sharing: $e'),
+            backgroundColor: AppColors.urgencyCritical,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _openChatWithPatient() async {

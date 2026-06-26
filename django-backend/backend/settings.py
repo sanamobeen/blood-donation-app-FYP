@@ -15,6 +15,7 @@ from pathlib import Path
 from datetime import timedelta
 from decouple import config, config as env
 import dotenv
+import os
 
 # Load environment variables from .env file
 dotenv.load_dotenv()
@@ -33,6 +34,12 @@ SECRET_KEY = 'django-insecure-l1-&ii&8$6@+01l842gzi9d)87h5dc(o95a0rz+&ujhieh51a=
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']  # Allow all hosts for development (update for production)
+# For ngrok, specifically add: '6411-103-150-239-29.ngrok-free.app'
+
+# External Pledge System: Public base URL for share links
+# Configure this to your production domain (e.g., 'https://bloodconnect.com')
+# For ngrok: 'https://6411-103-150-239-29.ngrok-free.app'
+PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', 'https://6411-103-150-239-29.ngrok-free.app')
 
 
 # Application definition
@@ -82,7 +89,7 @@ ROOT_URLCONF = 'backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'blood_requests' / 'templates'],  # External pledge system templates
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

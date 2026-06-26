@@ -74,7 +74,10 @@ class ApiConfig {
   // ==================== MANUAL OVERRIDE ====================
 
   /// Force a specific URL (useful for testing or production)
-  static String? forcedBaseUrl;
+  /// For ngrok: 'https://6411-103-150-239-29.ngrok-free.app'
+  // Commented out to use local development server
+  // static String? forcedBaseUrl = 'https://6411-103-150-239-29.ngrok-free.app';
+  static String? forcedBaseUrl = null;
 
   /// Reset to auto-detection
   static void resetToAuto() {

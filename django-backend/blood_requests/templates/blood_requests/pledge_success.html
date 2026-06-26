@@ -1,0 +1,90 @@
+{% extends "blood_requests/base.html" %}
+
+{% block title %}Pledge Successful - Thank You!{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align: center; max-width: 600px; margin: 0 auto;">
+    <div style="font-size: 4rem; margin-bottom: 20px;">🎉</div>
+    <h1 style="font-family: 'Poppins', sans-serif; font-size: 2rem; color: var(--success); margin-bottom: 20px;">
+        Pledge Successful!
+    </h1>
+    <p style="font-size: 1.1rem; color: var(--text-light); margin-bottom: 30px;">
+        Thank you for pledging to donate blood. Your generosity can save a life!
+    </p>
+
+    <div class="alert alert-success" style="text-align: left; margin-bottom: 30px;">
+        <h3 style="margin-bottom: 15px;">What Happens Next?</h3>
+        <ol style="padding-left: 20px; line-height: 2;">
+            <li>The patient will be notified of your pledge</li>
+            <li>They will contact you at the phone number you provided</li>
+            <li>You'll coordinate the donation time and location</li>
+            <li>After donation, you'll receive a certificate of appreciation</li>
+        </ol>
+    </div>
+
+    <div class="privacy-notice" style="text-align: left;">
+        <p>
+            📞 <strong>Keep your phone handy:</strong> The patient may contact you soon to coordinate the donation.
+        </p>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <a href="javascript:window.close()" class="btn btn-primary">
+            Close Window
+        </a>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 20px; max-width: 600px; margin: 20px auto;">
+    <div class="card-header">
+        <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.25rem;">Share This Request</h3>
+    </div>
+    <p style="color: var(--text-light); margin-bottom: 20px;">
+        Help save more lives by sharing this blood request with others who may be able to help.
+    </p>
+    <button onclick="shareRequest()" class="btn btn-primary btn-block">
+        📤 Share Request Link
+    </button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function shareRequest() {
+    const shareUrl = window.location.href;
+    const shareText = '🩸 Urgent blood request needed! Help save a life by donating blood.';
+
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Blood Donation Request',
+                text: shareText,
+                url: shareUrl
+            });
+        } catch (err) {
+            // User cancelled or sharing failed
+            copyToClipboard(shareUrl);
+        }
+    } else {
+        // Fallback: copy to clipboard
+        copyToClipboard(shareUrl);
+    }
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Link copied to clipboard! Share it with potential donors.');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('Link copied to clipboard! Share it with potential donors.');
+    });
+}
+}
+</script>
+{% endblock %}
