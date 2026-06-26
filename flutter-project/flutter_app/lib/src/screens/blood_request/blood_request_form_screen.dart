@@ -35,6 +35,19 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
     _loadUserProfile();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Quiz section removed from patient side
+    // No longer loading quiz responses from navigation
+  }
+
+  /// Load quiz responses from navigation arguments (disabled)
+  void _loadQuizResponses() {
+    // Quiz functionality removed from patient side
+    // Keeping this method for potential future use
+  }
+
   /// Load user profile to get existing location data
   Future<void> _loadUserProfile() async {
     try {
@@ -587,6 +600,7 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
     });
 
     try {
+      // Quiz section removed - no longer sending quiz responses
       // Call API to create blood request with location details
       final result = await ApiService.createBloodRequest(
         patientName: _patientNameController.text.trim(),

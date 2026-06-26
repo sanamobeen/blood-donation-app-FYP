@@ -45,6 +45,8 @@ class BloodRequestSerializer(serializers.ModelSerializer):
             'emergency_level',
             'is_emergency',
             'active_donor_pledge_id',
+            # Quiz responses
+            'quiz_responses',
         ]
         read_only_fields = ['id', 'status', 'expires_at', 'created_at', 'updated_at', 'requested_by', 'broadcast_radius', 'emergency_donors_notified', 'emergency_donors_responded', 'emergency_expires_at', 'emergency_first_response_time', 'emergency_level', 'is_emergency', 'active_donor_pledge_id']
 
@@ -155,6 +157,8 @@ class DetailedBloodRequestSerializer(serializers.ModelSerializer):
             'requester_name',
             'requester_profile_picture',
             'requested_by_id',
+            # Quiz responses
+            'quiz_responses',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'is_urgent', 'requester_name', 'requester_profile_picture', 'units_remaining', 'requested_by_id', 'expires_soon']
 
