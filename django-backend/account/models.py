@@ -275,6 +275,17 @@ class UserProfile(models.Model):
         help_text="Timestamp of last FCM token update"
     )
 
+    # Donation Availability
+    is_available_for_donation = models.BooleanField(
+        default=True,
+        help_text="Whether the donor is currently available for blood donation"
+    )
+    last_donation_date = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Date of last blood donation"
+    )
+
     class Meta:
         verbose_name = 'User Profile'
         verbose_name_plural = 'User Profiles'

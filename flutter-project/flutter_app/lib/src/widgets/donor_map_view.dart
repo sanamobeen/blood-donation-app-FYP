@@ -9,12 +9,18 @@ class DonorMapView extends StatelessWidget {
   final double? patientLat;
   final double? patientLng;
   final List<Map<String, dynamic>> donors;
+  final double? currentUserLat; // Current donor's location
+  final double? currentUserLng;
+  final double? distanceKm; // Distance between donor and patient
 
   const DonorMapView({
     super.key,
     required this.patientLat,
     required this.patientLng,
     required this.donors,
+    this.currentUserLat,
+    this.currentUserLng,
+    this.distanceKm,
   });
 
   @override
@@ -52,6 +58,17 @@ class DonorMapView extends StatelessWidget {
 
     final patientLocation = LatLng(patientLat!, patientLng!);
 
+    // Calculate map center to include both patient and current user if available
+    LatLng mapCenter = patientLocation;
+    if (currentUserLat != null && currentUserLng != null) {
+      final userLocation = LatLng(currentUserLat!, currentUserLng!);
+      // Center between patient and user
+      mapCenter = LatLng(
+        (patientLocation.latitude + userLocation.latitude) / 2,
+        (patientLocation.longitude + userLocation.longitude) / 2,
+      );
+    }
+
     return Container(
       height: 250,
       decoration: BoxDecoration(
@@ -62,7 +79,7 @@ class DonorMapView extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: FlutterMap(
           options: MapOptions(
-            initialCenter: patientLocation,
+            initialCenter: mapCenter,
             initialZoom: 13,
             minZoom: 10,
             maxZoom: 18,
@@ -98,6 +115,37 @@ class DonorMapView extends StatelessWidget {
                 ),
               ],
             ),
+
+            // Current user (donor) location marker
+            if (currentUserLat != null && currentUserLng != null)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: LatLng(currentUserLat!, currentUserLng!),
+                    width: 36,
+                    height: 36,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
 
             // Donor markers (approximate locations)
             if (donors.isNotEmpty)

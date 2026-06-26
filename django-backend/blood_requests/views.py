@@ -176,6 +176,26 @@ def blood_request_create(request):
             blood_request = serializer.save()
             logger.info(f"Blood request saved - lat: {blood_request.location_lat}, lng: {blood_request.location_lng}")
 
+            # Create PatientQuiz record if quiz_responses were provided
+            quiz_responses = request.data.get('quiz_responses')
+            if quiz_responses and isinstance(quiz_responses, dict):
+                from .models import PatientQuiz
+                try:
+                    PatientQuiz.objects.create(
+                        blood_request=blood_request,
+                        had_blood_transfusion=quiz_responses.get('had_blood_transfusion', False),
+                        had_tattoo_piercing=quiz_responses.get('had_tattoo_piercing', False),
+                        had_surgery=quiz_responses.get('had_surgery', False),
+                        on_medication=quiz_responses.get('on_medication', False),
+                        has_chronic_disease=quiz_responses.get('has_chronic_disease', False),
+                        traveled_malaria_area=quiz_responses.get('traveled_malaria_area', False),
+                        other_medical_info=quiz_responses.get('other_medical_info'),
+                    )
+                    logger.info(f"PatientQuiz created for blood request: {blood_request.id}")
+                except Exception as quiz_error:
+                    logger.error(f"Failed to create PatientQuiz: {str(quiz_error)}")
+                    # Continue even if quiz creation fails
+
             # Phase 1: Set expiration based on urgency
             from .utils import calculate_request_expiration_hours
             expires_in_hours = calculate_request_expiration_hours(blood_request.urgency_level)

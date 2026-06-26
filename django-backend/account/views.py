@@ -1479,8 +1479,8 @@ def nearby_donors(request):
             if distance_km <= radius:
                 donor_data = PublicProfileSerializer(profile).data
                 donor_data['id'] = str(profile.user.id)
-                donor_data['full_name'] = profile.user.get_full_name()
-                donor_data['blood_type'] = profile.blood_group
+                donor_data['full_name'] = profile.user.get_full_name() or profile.user.email
+                donor_data['blood_group'] = profile.blood_group
                 donor_data['distance_km'] = round(distance_km, 1)
                 donor_data['last_donation_date'] = profile.last_donation_date.strftime('%Y-%m-%d') if profile.last_donation_date else None
                 donor_data['is_available'] = profile.is_available_for_donation

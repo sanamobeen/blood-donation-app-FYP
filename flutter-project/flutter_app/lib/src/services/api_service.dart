@@ -646,6 +646,7 @@ class ApiService {
     String? additionalNotes,
     double? locationLat,
     double? locationLng,
+    Map<String, dynamic>? quizResponses,
   }) async {
     try {
 
@@ -664,6 +665,7 @@ class ApiService {
           if (additionalNotes != null && additionalNotes.isNotEmpty) 'additional_notes': additionalNotes,
           if (locationLat != null && locationLng != null) 'location_lat': locationLat,
           if (locationLat != null && locationLng != null) 'location_lng': locationLng,
+          if (quizResponses != null) 'quiz_responses': quizResponses,
         }),
       );
 

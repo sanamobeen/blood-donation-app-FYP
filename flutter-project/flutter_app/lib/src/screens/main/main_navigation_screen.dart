@@ -1890,13 +1890,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
           const SizedBox(width: 12),
           _QuickActionButton(
-            key: const ValueKey('action_requests'),
-            title: 'Requests',
-            icon: Icons.location_on,
-            onTap: () => Navigator.pushNamed(context, AppRoutes.nearbyRequests),
-          ),
-          const SizedBox(width: 12),
-          _QuickActionButton(
             key: const ValueKey('action_chat'),
             title: 'Chat',
             icon: Icons.message,
@@ -2107,14 +2100,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         case AppRoutes.myRequests:
           // Patients use my requests (index 1)
           return 1;
-        case AppRoutes.findDonors:
-          return 2;
         case AppRoutes.messages:
-          return 3;
+          return 2;
         case AppRoutes.chatList:
-          return 3;
+          return 2;
         case AppRoutes.settings:
-          return 4;
+          return 3;
         default:
           return 0;
       }
@@ -2137,13 +2128,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           case 1: // Requests
             Navigator.pushReplacementNamed(context, getRequestsRoute());
             break;
-          case 2: // Map
-            Navigator.pushReplacementNamed(context, AppRoutes.findDonors);
-            break;
-          case 3: // Chat/Messages
+          case 2: // Chat/Messages
             Navigator.pushReplacementNamed(context, AppRoutes.messages);
             break;
-          case 4: // Profile/Settings
+          case 3: // Profile/Settings
             Navigator.pushReplacementNamed(context, AppRoutes.settings);
             break;
         }

@@ -9,6 +9,8 @@ import 'screens/auth/change_password_step1_screen.dart';
 import 'screens/auth/change_password_step2_screen.dart';
 import 'screens/ai_chatbot/ai_chatbot_screen.dart';
 import 'screens/blood_request/blood_request_form_screen.dart';
+// Quiz screen removed from patient flow
+// import 'screens/blood_request/patient_quiz_screen.dart';
 import 'screens/donations/my_donations_screen.dart';
 // import 'screens/home/home_screen.dart'; // Removed - using MainNavigationScreen instead
 import 'screens/messages/messages_screen.dart';
@@ -21,6 +23,7 @@ import 'screens/patient_home/patient_home_screen.dart';
 // import 'screens/quiz/health_eligibility_quiz_screen.dart';
 import 'screens/donors/donor_profile_screen.dart';
 import 'screens/donors/find_donors_screen.dart';
+import 'screens/map/unified_map_screen.dart';
 import 'screens/patient/nearby_donors_map_screen.dart';
 import 'screens/patient/all_responding_donors_screen.dart';
 import 'screens/profile/profile_screen.dart';
@@ -61,6 +64,7 @@ class AppRoutes {
   static const myDonations = '/my-donations';
   static const donorProfile = '/donor-profile';
   static const findDonors = '/find-donors';
+  static const unifiedMap = '/unified-map';
   static const nearbyDonorsMap = '/nearby-donors-map';
   static const myRequests = '/my-requests';
   static const nearbyRequests = '/nearby-requests';
@@ -70,6 +74,8 @@ class AppRoutes {
   static const profile = '/profile';
   static const editProfile = '/edit-profile';
   static const patientHome = '/patient-home';
+  // Quiz screen removed from patient flow
+  // static const patientQuiz = '/patient-quiz';
   static const bloodRequestForm = '/blood-request-form';
   // Quiz feature removed from donor side
   // static const healthEligibilityQuiz = '/health-eligibility-quiz';
@@ -103,6 +109,7 @@ class AppRoutes {
     sos: (context) => const SOSScreen(),
     sosActive: (context) => const SOSActiveScreen(),
     findDonors: (context) => const FindDonorsScreen(),
+    unifiedMap: (context) => const UnifiedMapScreen(),
     donorProfile: (context) {
       final donor = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       return DonorProfileScreen(donor: donor ?? {});
@@ -117,6 +124,8 @@ class AppRoutes {
     profile: (context) => const ProfileScreen(),
     editProfile: (context) => const EditProfileScreen(),
     patientHome: (context) => const PatientHomeScreen(),
+    // Quiz screen removed from patient flow
+    // patientQuiz: (context) => const PatientQuizScreen(),
     bloodRequestForm: (context) => const BloodRequestFormScreen(),
     // Quiz feature removed from donor side
     // healthEligibilityQuiz: (context) => const HealthEligibilityQuizScreen(),
