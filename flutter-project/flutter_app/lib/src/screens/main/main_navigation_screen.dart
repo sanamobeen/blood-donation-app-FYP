@@ -115,15 +115,30 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         final isStillValid = result['is_still_valid'] as bool? ?? true;
         final healthQuizCompleted = eligibility['health_quiz_completed'] as bool? ?? false;
 
+        // Debug logging
+        print('DEBUG: Eligibility check result: $result');
+        print('DEBUG: health_quiz_completed: $healthQuizCompleted');
+        print('DEBUG: is_still_valid: $isStillValid');
+
         // If health quiz not completed or eligibility is not valid, redirect to quiz
         if (!healthQuizCompleted || !isStillValid) {
           if (mounted) {
             _showEligibilityRequiredDialog();
           }
         }
+      } else {
+        // API returned success=false
+        print('DEBUG: Eligibility API returned success=false: ${result['message']}');
+        if (mounted) {
+          _showEligibilityRequiredDialog();
+        }
       }
     } catch (e) {
-      // Silently fail - don't block app usage if eligibility check fails
+      // Log error and show dialog to ensure user can complete quiz
+      print('DEBUG: Eligibility check failed with error: $e');
+      if (mounted) {
+        _showEligibilityRequiredDialog();
+      }
     }
   }
 
