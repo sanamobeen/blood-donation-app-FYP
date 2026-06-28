@@ -249,10 +249,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           }
 
 
-          // Profile created successfully - navigate to unified main navigation
+          // Profile created successfully - navigate based on user role
           // The main navigation screen will show the appropriate UI based on user's role
           if (mounted) {
-            Navigator.pushReplacementNamed(context, AppRoutes.mainNavigation);
+            // For donors: Navigate to Health Eligibility Quiz first
+            if (_userRole == 'donor') {
+              Navigator.pushReplacementNamed(context, AppRoutes.healthEligibilityQuiz);
+            } else {
+              // For patients: Go directly to main navigation
+              Navigator.pushReplacementNamed(context, AppRoutes.mainNavigation);
+            }
           }
         }
       } else {

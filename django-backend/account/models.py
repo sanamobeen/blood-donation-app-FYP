@@ -178,6 +178,19 @@ class UserProfile(models.Model):
         related_name='profile'
     )
 
+    # User Role (mirrored from CustomUser for easier access)
+    role = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        choices=[
+            ('donor', 'Donor'),
+            ('patient', 'Patient'),
+            ('admin', 'Admin'),
+        ],
+        help_text="User role: donor, patient, or admin"
+    )
+
     # Blood Donation Information
     blood_group = models.CharField(
         max_length=5,
@@ -286,11 +299,23 @@ class UserProfile(models.Model):
         help_text="Date of last blood donation"
     )
 
+    # Health Quiz Status
+    health_quiz_completed = models.BooleanField(
+        default=False,
+        help_text="Whether the user has completed the health eligibility quiz"
+    )
+    health_quiz_completed_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Timestamp when health quiz was completed"
+    )
+
     class Meta:
         verbose_name = 'User Profile'
         verbose_name_plural = 'User Profiles'
         indexes = [
             models.Index(fields=['user']),
+            models.Index(fields=['role']),
             models.Index(fields=['blood_group']),
             models.Index(fields=['city']),
             models.Index(fields=['location_lat', 'location_lng']),
@@ -298,6 +323,13 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"Profile of {self.user.email}"
+
+    def save(self, *args, **kwargs):
+        # Sync role from user if not set or different
+        if self.user and self.user.role:
+            if self.role != self.user.role:
+                self.role = self.user.role
+        super().save(*args, **kwargs)
 
 
 class PasswordReset(models.Model):

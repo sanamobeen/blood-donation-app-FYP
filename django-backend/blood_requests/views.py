@@ -756,6 +756,48 @@ def create_pledge(request, request_id):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
 
+        # Check health eligibility quiz status
+        try:
+            from health.models import EligibilityRecord
+            eligibility_record = EligibilityRecord.objects.filter(user=request.user).first()
+
+            if eligibility_record:
+                # Check if eligibility is still valid (within 30 days)
+                is_still_valid = True
+                if eligibility_record.eligibility_valid_until:
+                    if eligibility_record.eligibility_valid_until < timezone.now().date():
+                        is_still_valid = False
+
+                # If not eligible or eligibility expired, prevent pledge
+                if not eligibility_record.is_eligible:
+                    logger.info(f"❌ User not eligible based on health quiz: {eligibility_record.disqualification_reasons}")
+                    return error_response(
+                        message=f'You are not eligible to donate based on your health quiz responses. Reasons: {", ".join(eligibility_record.disqualification_reasons)}. Please consult with a healthcare provider.',
+                        status_code=status.HTTP_403_FORBIDDEN
+                    )
+
+                if not is_still_valid:
+                    logger.info(f"❌ User health eligibility expired on {eligibility_record.eligibility_valid_until}")
+                    return error_response(
+                        message='Your health eligibility has expired (valid for 30 days). Please retake the health eligibility quiz before pledging.',
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        error_code='ELIGIBILITY_EXPIRED'
+                    )
+
+                logger.info(f"✅ User health eligibility confirmed: valid until {eligibility_record.eligibility_valid_until}")
+            else:
+                # No eligibility record found - require quiz
+                logger.info(f"❌ No health eligibility record found for user")
+                return error_response(
+                    message='Please complete the health eligibility quiz before pledging to donate.',
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    error_code='QUIZ_REQUIRED'
+                )
+        except Exception as e:
+            logger.warning(f"⚠️  Could not verify health eligibility: {str(e)}")
+            # Fail open - allow pledge if eligibility check fails
+            logger.info(f"⚠️  Proceeding with pledge despite eligibility check failure")
+
         # Validate pledge data
         pledge_serializer = DonorResponseCreateSerializer(data=request.data)
         if not pledge_serializer.is_valid():
