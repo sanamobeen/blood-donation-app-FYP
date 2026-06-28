@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/firebase_chat_service.dart';
 import '../models/chat_conversation.dart';
 import '../screens/chat/chat_conversation_screen.dart';
+import '../app_routes.dart';
 
 /// Dialog for donors to pledge to donate blood for a request
 class PledgeDialog extends StatefulWidget {
@@ -126,6 +127,20 @@ class _PledgeDialogState extends State<PledgeDialog> {
       } else {
         // Show error message
         final message = response['message'] ?? 'Failed to create pledge';
+        final errorCode = response['error_code'];
+
+        // Handle eligibility-specific errors
+        if (errorCode == 'ELIGIBILITY_EXPIRED') {
+          Navigator.of(context).pop();
+          _showEligibilityExpiredDialog();
+          return;
+        }
+
+        if (errorCode == 'QUIZ_REQUIRED') {
+          Navigator.of(context).pop();
+          _showQuizRequiredDialog();
+          return;
+        }
 
         // Close dialog if already pledged (prevent multiple popups)
         if (message.contains('already pledged') || message.contains('already')) {
@@ -142,6 +157,138 @@ class _PledgeDialogState extends State<PledgeDialog> {
         );
       }
     }
+  }
+
+  void _showEligibilityExpiredDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFA726),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.access_time,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Eligibility Expired',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFFFA726),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Your health eligibility has expired (valid for 30 days). Please retake the health eligibility quiz before pledging to donate.',
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate to health eligibility quiz
+                Navigator.pushReplacementNamed(context, AppRoutes.healthEligibilityQuiz);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text(
+                'Retake Quiz',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQuizRequiredDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.quiz,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Health Quiz Required',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Please complete the health eligibility quiz before pledging to donate. This helps ensure the safety of both donors and recipients.',
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate to health eligibility quiz
+                Navigator.pushReplacementNamed(context, AppRoutes.healthEligibilityQuiz);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text(
+                'Start Quiz',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

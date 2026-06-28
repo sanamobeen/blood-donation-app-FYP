@@ -1276,6 +1276,103 @@ class ApiService {
     }
   }
 
+  // ===== Health Eligibility Quiz API =====
+
+  /// Get health eligibility quiz questions
+  static Future<Map<String, dynamic>> getHealthQuiz() async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.healthEndpoint}/quiz/'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'questions': data['questions'] ?? [],
+          'message': data['message'] ?? 'Questions loaded successfully'
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Failed to load quiz questions'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Submit health eligibility quiz responses
+  static Future<Map<String, dynamic>> submitHealthQuiz(Map<String, String> responses) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      // Backend expects responses as a dictionary: {"question_id": "answer"}
+      final responsesData = <String, String>{};
+      for (var entry in responses.entries) {
+        responsesData[entry.key] = entry.value;
+      }
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.healthEndpoint}/quiz/submit/'),
+        headers: headers,
+        body: jsonEncode({'responses': responsesData}),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {
+          'success': true,
+          'data': data['data'] ?? {},
+          'message': data['message'] ?? 'Quiz submitted successfully'
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Failed to submit quiz'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Get health eligibility status
+  static Future<Map<String, dynamic>> getHealthEligibilityStatus() async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.healthEndpoint}/eligibility/'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'eligibility': data['eligibility'] ?? {},
+          'is_still_valid': data['is_still_valid'] ?? true,
+          'message': data['message'] ?? 'Eligibility status retrieved'
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Failed to fetch eligibility status'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
   // ===== SOS API =====
 
   /// Create SOS emergency request

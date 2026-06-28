@@ -19,8 +19,7 @@ import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/onboarding/onboarding_screen_2.dart';
 import 'screens/onboarding/onboarding_screen3.dart';
 import 'screens/patient_home/patient_home_screen.dart';
-// Quiz feature removed from donor side
-// import 'screens/quiz/health_eligibility_quiz_screen.dart';
+import 'screens/quiz/health_eligibility_quiz_screen.dart';
 import 'screens/donors/donor_profile_screen.dart';
 import 'screens/donors/find_donors_screen.dart';
 import 'screens/map/unified_map_screen.dart';
@@ -74,11 +73,8 @@ class AppRoutes {
   static const profile = '/profile';
   static const editProfile = '/edit-profile';
   static const patientHome = '/patient-home';
-  // Quiz screen removed from patient flow
-  // static const patientQuiz = '/patient-quiz';
   static const bloodRequestForm = '/blood-request-form';
-  // Quiz feature removed from donor side
-  // static const healthEligibilityQuiz = '/health-eligibility-quiz';
+  static const healthEligibilityQuiz = '/health-eligibility-quiz';
   static const aiChatbot = '/ai-chatbot';
   static const settings = '/settings';
   static const help = '/help';
@@ -127,8 +123,7 @@ class AppRoutes {
     // Quiz screen removed from patient flow
     // patientQuiz: (context) => const PatientQuizScreen(),
     bloodRequestForm: (context) => const BloodRequestFormScreen(),
-    // Quiz feature removed from donor side
-    // healthEligibilityQuiz: (context) => const HealthEligibilityQuizScreen(),
+    healthEligibilityQuiz: (context) => const HealthEligibilityQuizScreen(),
     aiChatbot: (context) => const AIChatbotScreen(),
     settings: (context) => const SettingsScreen(),
     help: (context) => const HelpScreen(),
