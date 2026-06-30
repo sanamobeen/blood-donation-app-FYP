@@ -1517,14 +1517,17 @@ class _RequestCard extends StatelessWidget {
                         children: [
                           const Icon(Icons.location_on, size: 12, color: AppColors.textSecondary),
                           const SizedBox(width: 4),
-                          Text(
-                            distance,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+                          Expanded(
+                            child: Text(
+                              hospital,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           const Icon(Icons.access_time, size: 12, color: AppColors.textSecondary),
                           const SizedBox(width: 4),
                           Text(
@@ -1534,7 +1537,22 @@ class _RequestCard extends StatelessWidget {
                               color: AppColors.textSecondary,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            '$unitsNeeded unit${unitsNeeded > 1 ? "s" : ""} needed',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('•'),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -1544,13 +1562,24 @@ class _RequestCard extends StatelessWidget {
                               color: priorityColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(
-                              priority,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: priorityColor,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  priority == 'critical' ? Icons.crisis_alert : Icons.priority_high,
+                                  size: 10,
+                                  color: priorityColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  priority,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: priorityColor,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -1581,7 +1610,7 @@ class _RequestCard extends StatelessWidget {
                     ? 'Your Request'
                     : hasPledged
                         ? 'You Have Pledged'
-                        : 'I Can Help - Pledge 1 Unit',
+                        : 'I Can Help - Donate Now',
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: (hasPledged || isOwnRequest)
