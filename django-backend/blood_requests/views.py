@@ -1622,8 +1622,7 @@ def accept_pledge(request, request_id, pledge_id):
                         notification_data['hospital_name'] = blood_request.hospital_name
                     if blood_request.location:
                         notification_data['location'] = blood_request.location
-                    if blood_request.city:
-                        notification_data['city'] = blood_request.city
+                    # Note: BloodRequest doesn't have a city field, city is in UserProfile
                     if blood_request.location_lat and blood_request.location_lng:
                         notification_data['location_lat'] = str(blood_request.location_lat)
                         notification_data['location_lng'] = str(blood_request.location_lng)
