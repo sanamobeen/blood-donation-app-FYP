@@ -610,8 +610,10 @@ def nearby_blood_requests(request):
                 request_dict['distance_km'] = round(distance, 1)
                 requests_data.append(request_dict)
 
-        # Sort by distance (nearest first) then by urgency
-        requests_data.sort(key=lambda x: (x['distance_km'], x.get('urgency_level', 'normal')))
+        # Sort by latest requests first (newest created_at), then by distance (nearest for same date)
+        # Use stable sort: sort by secondary key first, then by primary key
+        requests_data.sort(key=lambda x: x['distance_km'])  # Secondary: distance ascending
+        requests_data.sort(key=lambda x: x.get('created_at', ''), reverse=True)  # Primary: newest first
 
         return success_response(
             message=f'Found {len(requests_data)} nearby blood requests.',
