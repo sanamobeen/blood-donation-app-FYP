@@ -3,14 +3,14 @@ import 'package:geolocator/geolocator.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
 
-class SOSScreen extends StatefulWidget {
-  const SOSScreen({super.key});
+class SOSScreenApi extends StatefulWidget {
+  const SOSScreenApi({super.key});
 
   @override
-  State<SOSScreen> createState() => _SOSScreenState();
+  State<SOSScreenApi> createState() => _SOSScreenApiState();
 }
 
-class _SOSSScreenState extends State<SOSScreen> {
+class _SOSScreenApiState extends State<SOSScreenApi> {
   // Blood groups
   final List<String> _bloodGroups = [
     'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-',
@@ -18,11 +18,11 @@ class _SOSSScreenState extends State<SOSScreen> {
 
   // Distance options
   final List<double> _distanceOptions = [5, 15, 25, 50];
-  double _selectedDistance = 15;
+  double _selectedDistance = 5;
 
   // Selected values
-  String _selectedBloodGroup = 'O+';
-  int _unitsNeeded = 2;
+  String? _selectedBloodGroup;
+  int _unitsNeeded = 1;
   String _situationDescription = '';
 
   // Form controllers
@@ -31,7 +31,8 @@ class _SOSSScreenState extends State<SOSScreen> {
   final TextEditingController _contactPhoneController = TextEditingController();
   final TextEditingController _patientNameController = TextEditingController();
   final TextEditingController _ageController = TextEditingController(text: '35');
-  String _selectedGender = 'Female';
+  late TextEditingController _situationController;
+  String _selectedGender = 'female';
 
   // SOS activation
   bool _isHolding = false;
@@ -44,6 +45,7 @@ class _SOSSScreenState extends State<SOSScreen> {
   @override
   void initState() {
     super.initState();
+    _situationController = TextEditingController(text: _situationDescription);
     _getCurrentLocation();
   }
 
@@ -54,6 +56,7 @@ class _SOSSScreenState extends State<SOSScreen> {
     _contactPhoneController.dispose();
     _patientNameController.dispose();
     _ageController.dispose();
+    _situationController.dispose();
     super.dispose();
   }
 
@@ -516,10 +519,10 @@ class _SOSSScreenState extends State<SOSScreen> {
           color: Color(0xFFD62828),
         ),
         underline: const SizedBox.shrink(),
-        items: ['Male', 'Female', 'Other'].map((String gender) {
+        items: ['male', 'female', 'other'].map((String gender) {
           return DropdownMenuItem<String>(
             value: gender,
-            child: Text(gender),
+            child: Text(gender[0].toUpperCase() + gender.substring(1)), // Display with capital first letter
           );
         }).toList(),
         onChanged: (String? newValue) {
@@ -576,50 +579,67 @@ class _SOSSScreenState extends State<SOSScreen> {
               ],
             ),
           ),
-          DropdownButton<String>(
-            value: _selectedBloodGroup,
-            icon: const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFFD62828),
-            ),
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFD62828),
-            ),
-            underline: const SizedBox.shrink(),
-            items: _bloodGroups.map((String group) {
-              return DropdownMenuItem<String>(
-                value: group,
-                child: Row(
-                  children: [
-                    Text(
-                      group,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFD62828),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      group.contains('+') ? '(Positive)' : '(Negative)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+          if (_selectedBloodGroup == null)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedBloodGroup = _bloodGroups.first;
+                });
+              },
+              child: Text(
+                'Select blood group',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade400,
+                  fontWeight: FontWeight.w500,
                 ),
-              );
-            }).toList(),
-            onChanged: (String? newValue) {
-              setState(() {
-                _selectedBloodGroup = newValue!;
-              });
-            },
-          ),
+              ),
+            )
+          else
+            DropdownButton<String>(
+              value: _selectedBloodGroup,
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFFD62828),
+              ),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFD62828),
+              ),
+              underline: const SizedBox.shrink(),
+              items: _bloodGroups.map((String group) {
+                return DropdownMenuItem<String>(
+                  value: group,
+                  child: Row(
+                    children: [
+                      Text(
+                        group,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFD62828),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        group.contains('+') ? '(Positive)' : '(Negative)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedBloodGroup = newValue!;
+                });
+              },
+            ),
         ],
       ),
     );
@@ -829,7 +849,7 @@ class _SOSSScreenState extends State<SOSScreen> {
           child: TextField(
             maxLines: 4,
             maxLength: maxLength,
-            controller: TextEditingController(text: _situationDescription),
+            controller: _situationController,
             onChanged: (value) {
               setState(() {
                 _situationDescription = value;
@@ -845,11 +865,6 @@ class _SOSSScreenState extends State<SOSScreen> {
               contentPadding: EdgeInsets.zero,
               isDense: true,
               counterText: '',
-              hintText: 'Describe the emergency situation...',
-              hintStyle: TextStyle(
-                color: Color(0xFF9E9E9E),
-                fontSize: 14,
-              ),
             ),
           ),
         ),
@@ -919,6 +934,12 @@ class _SOSSScreenState extends State<SOSScreen> {
   void _activateSOS() async {
     if (_isActivated || _isSubmitting) return;
 
+    // Validate blood group is selected
+    if (_selectedBloodGroup == null) {
+      _showErrorDialog('Please select a blood group first');
+      return;
+    }
+
     // Validate required fields
     if (_hospitalNameController.text.isEmpty ||
         _hospitalAddressController.text.isEmpty ||
@@ -933,20 +954,22 @@ class _SOSSScreenState extends State<SOSScreen> {
     });
 
     try {
-      // Get blood type ID (in real app, you'd fetch this from API)
-      final bloodTypeId = _getBloodTypeId(_selectedBloodGroup);
-
+      // Send blood group string directly (backend expects "O+", "A+", etc., not integer IDs)
       final result = await ApiService.createSosRequest(
-        bloodType: bloodTypeId.toString(),
+        bloodType: _selectedBloodGroup!,
         hospitalName: _hospitalNameController.text,
-        hospitalAddress: _hospitalAddressController.text,
+        hospitalAddress: _hospitalNameController.text,
         contactPhone: _contactPhoneController.text,
         patientName: _patientNameController.text,
         age: int.tryParse(_ageController.text) ?? 35,
         gender: _selectedGender,
         unitsNeeded: _unitsNeeded,
-        hospitalLat: _currentPosition?.latitude,
-        hospitalLng: _currentPosition?.longitude,
+        hospitalLat: _currentPosition != null
+            ? double.parse(_currentPosition!.latitude.toStringAsFixed(6))
+            : null,
+        hospitalLng: _currentPosition != null
+            ? double.parse(_currentPosition!.longitude.toStringAsFixed(6))
+            : null,
       );
 
       setState(() {
@@ -969,14 +992,6 @@ class _SOSSScreenState extends State<SOSScreen> {
     }
   }
 
-  int _getBloodTypeId(String bloodGroup) {
-    // Simple mapping - in real app, fetch from API
-    final mapping = {
-      'A+': 1, 'A-': 2, 'B+': 3, 'B-': 4,
-      'O+': 5, 'O-': 6, 'AB+': 7, 'AB-': 8,
-    };
-    return mapping[bloodGroup] ?? 1;
-  }
 
   void _showSOSActivatedDialog() {
     showDialog(

@@ -376,6 +376,7 @@ def list_notifications(request):
                 'related_request_id': str(notif.related_request_id) if notif.related_request_id else None,
                 'related_pledge_id': str(notif.related_pledge_id) if notif.related_pledge_id else None,
                 'related_conversation_id': str(notif.related_conversation_id) if notif.related_conversation_id else None,
+                'data': notif.data,  # Include notification data (donor details, etc.)
             })
 
         return success_response(
@@ -540,6 +541,7 @@ def send_push_notification(
         related_request_id=data.get('request_id') if data else None,
         related_pledge_id=data.get('pledge_id') if data else None,
         related_conversation_id=data.get('conversation_id') if data else None,
+        data=data,  # Include full data (donor details, location, etc.)
     )
 
     # Send push notification if enabled

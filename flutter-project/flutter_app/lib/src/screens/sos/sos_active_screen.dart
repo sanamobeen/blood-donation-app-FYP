@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/blood_type_chip.dart';
+import '../../services/api_service.dart';
 
-/// SOS Active Screen - Shows active emergency broadcast with live responders
-/// Displayed after SOS is activated, showing map and nearby donor responses
+/// SOS Active Screen - Shows active emergency broadcast with live map and responders
+/// Displays real map with SOS location and nearby donors who have responded
 class SOSActiveScreen extends StatefulWidget {
   const SOSActiveScreen({super.key});
 
@@ -15,68 +18,31 @@ class SOSActiveScreen extends StatefulWidget {
 class _SOSActiveScreenState extends State<SOSActiveScreen> {
   // Timer for elapsed time
   Timer? _timer;
-  int _elapsedSeconds = 83; // Starting at 1:23 (83 seconds)
+  int _elapsedSeconds = 0;
 
-  // Broadcast stats
-  int _donorsNotified = 47;
-  int _respondedCount = 8;
+  // Map controller and markers
+  late MapController _mapController;
+  final List<Marker> _markers = [];
+  LatLng? _sosLocation;
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  // Sort options
-  String _selectedSort = 'Newest first';
-
-  // Sample responders data
-  final List<Map<String, dynamic>> _responders = [
-    {
-      'id': '1',
-      'name': 'Arjun N.',
-      'bloodType': 'O+',
-      'units': 2,
-      'distance': 1.2,
-      'image': 'https://i.pravatar.cc/150?img=68',
-      'isAvailable': true,
-      'responseTime': 'Just now',
-    },
-    {
-      'id': '2',
-      'name': 'Priya S.',
-      'bloodType': 'B+',
-      'units': 1,
-      'distance': 2.4,
-      'image': 'https://i.pravatar.cc/150?img=47',
-      'isAvailable': true,
-      'responseTime': '1 min ago',
-    },
-    {
-      'id': '3',
-      'name': 'Rohit K.',
-      'bloodType': 'O+',
-      'units': 2,
-      'distance': 3.1,
-      'image': 'https://i.pravatar.cc/150?img=33',
-      'isAvailable': true,
-      'responseTime': '2 min ago',
-    },
-    {
-      'id': '4',
-      'name': 'Meera T.',
-      'bloodType': 'A+',
-      'units': 1,
-      'distance': 4.7,
-      'image': 'https://i.pravatar.cc/150?img=45',
-      'isAvailable': true,
-      'responseTime': '3 min ago',
-    },
-  ];
+  // SOS data
+  Map<String, dynamic>? _sosRequest;
+  List<Map<String, dynamic>> _responders = [];
 
   @override
   void initState() {
     super.initState();
+    _mapController = MapController();
     _startTimer();
+    _loadSOSData();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _mapController.dispose();
     super.dispose();
   }
 
@@ -93,20 +59,249 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
   String get _elapsedTime {
     final minutes = _elapsedSeconds ~/ 60;
     final seconds = _elapsedSeconds % 60;
-    return '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}';
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _loadSOSData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Get user's active SOS requests
+      final response = await ApiService.getActiveSosRequests(
+        lat: 0, // We'll get actual location from the SOS data
+        lng: 0,
+      );
+
+      if (response['success'] == true && response['data'] != null) {
+        final data = response['data'];
+        final requests = data['requests'] as List? ?? [];
+
+        if (requests.isNotEmpty) {
+          // Get the most recent SOS request
+          final sosRequest = requests.first as Map<String, dynamic>;
+
+          // Parse location
+          final lat = sosRequest['hospital_lat'] as double?;
+          final lng = sosRequest['hospital_lng'] as double?;
+
+          if (lat != null && lng != null) {
+            setState(() {
+              _sosRequest = sosRequest;
+              _sosLocation = LatLng(lat, lng);
+            });
+
+            // Fetch nearby donors/responders
+            await _fetchResponders(lat, lng);
+          } else {
+            setState(() {
+              _errorMessage = 'SOS location not available';
+              _isLoading = false;
+            });
+          }
+        } else {
+          setState(() {
+            _errorMessage = 'No active SOS requests found';
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          _errorMessage = response['message'] ?? 'Failed to load SOS data';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading SOS: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchResponders(double lat, double lng) async {
+    try {
+      // Fetch nearby donors
+      final response = await ApiService.getNearbyDonors(
+        lat: lat,
+        lng: lng,
+        radius: 50,
+      );
+
+      if (response['success'] == true && response['data'] != null) {
+        final data = response['data'];
+        final donorsList = (data['donors'] as List? ?? [])
+            .cast<Map<String, dynamic>>();
+
+        setState(() {
+          _responders = donorsList;
+          _isLoading = false;
+        });
+
+        _createMarkers();
+      } else {
+        setState(() {
+          _responders = [];
+          _isLoading = false;
+        });
+        _createMarkers();
+      }
+    } catch (e) {
+      print('Error fetching responders: $e');
+      setState(() {
+        _responders = [];
+        _isLoading = false;
+      });
+      _createMarkers();
+    }
+  }
+
+  void _createMarkers() {
+    _markers.clear();
+
+    if (_sosLocation == null) return;
+
+    // Add SOS location marker (Blood Drop)
+    _markers.add(
+      Marker(
+        point: _sosLocation!,
+        width: 80,
+        height: 80,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Outer ripple
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.primary.withOpacity(0.3),
+                  width: 2,
+                ),
+              ),
+            ),
+            // Blood drop icon
+            Container(
+              width: 50,
+              height: 50,
+              decoration: const BoxDecoration(
+                color: Color(0xFFD62828),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.bloodtype,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // Add responder markers
+    for (var i = 0; i < _responders.length; i++) {
+      final responder = _responders[i];
+      final lat = responder['lat'] as double?;
+      final lng = responder['lng'] as double?;
+
+      if (lat != null && lng != null) {
+        final bloodType = responder['blood_group'] as String? ?? 'Unknown';
+        final name = responder['full_name'] as String? ?? 'Donor';
+
+        _markers.add(
+          Marker(
+            point: LatLng(lat, lng),
+            width: 60,
+            height: 60,
+            child: GestureDetector(
+              onTap: () => _showResponderDialog(responder),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Blood type badge
+                  Positioned(
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(4),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 3,
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        bloodType,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Avatar circle
+                  Positioned(
+                    bottom: 0,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: CircleAvatar(
+                        backgroundColor: AppColors.softPink,
+                        child: Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : 'D',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F5F5),
       body: Column(
         children: [
           // Header
           _buildHeader(),
 
           // Map Section
-          _buildMapSection(),
+          Container(
+            height: 250,
+            child: _buildMapSection(),
+          ),
 
           // Live Responders List
           Expanded(
@@ -116,8 +311,8 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
           // Cancel SOS Button
           _buildCancelButton(),
 
-          // Bottom Broadcast Indicator
-          _buildBottomIndicator(),
+          // Bottom spacing
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -126,421 +321,207 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
   Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFFB71C1C), // Dark red
+        color: Color(0xFFB71C1C),
       ),
       child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  // Back Button
-                  GestureDetector(
-                    onTap: () {
-                      _showCancelSOSDialog();
-                    },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              // Back Button
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
                   ),
-
-                  const SizedBox(width: 12),
-
-                  // Title
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.sos_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'SOS Active — $_elapsedTime elapsed',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$_donorsNotified donors notified — $_respondedCount responded',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white,
+                    size: 16,
                   ),
-
-                  // Shield Icon
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.security_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+
+              const SizedBox(width: 12),
+
+              // Title
+              Expanded(
+                child: Text(
+                  'SOS Active — $_elapsedTime',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+
+              // Refresh Button
+              GestureDetector(
+                onTap: _loadSOSData,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.refresh,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildMapSection() {
-    return Container(
-      height: 200,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F0E6), // Light beige map color
-        border: Border(
-          bottom: BorderSide(color: AppColors.border, width: 1),
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Map Grid Lines
-          ..._buildMapGrid(),
-
-          // Neighborhood Labels
-          ..._buildNeighborhoodLabels(),
-
-          // SOS Location Marker (Blood Drop)
-          Positioned(
-            left: MediaQuery.of(context).size.width * 0.4,
-            top: 70,
-            child: Column(
-              children: [
-                // Outer ripple circle
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.primary.withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                ),
-                // Inner ripple circle
-                Positioned(
-                  left: 20,
-                  top: 20,
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.primary.withOpacity(0.5),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                ),
-                // Blood drop icon
-                Positioned(
-                  left: 40,
-                  top: 40,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFD62828),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.bloodtype,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Responder Profile Icons on Map
-          ..._buildResponderMapMarkers(),
-
-          // User's Location (Blue dot)
-          Positioned(
-            left: MediaQuery.of(context).size.width * 0.55,
-            top: 130,
-            child: Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.8),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.3),
-                    blurRadius: 8,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Compass/Rotate Icon
-          Positioned(
-            right: 16,
-            bottom: 16,
-            child: GestureDetector(
-              onTap: () {
-              },
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.navigation_rounded,
-                  color: AppColors.textPrimary,
-                  size: 20,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildMapGrid() {
-    return List.generate(15, (index) {
-      return Positioned(
-        top: (index % 5) * 50.0,
-        left: ((index / 5).floor() * 80.0),
-        child: Container(
-          width: 80,
-          height: 50,
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: const Color(0xFFE0D6C0).withOpacity(0.4),
-              width: 1,
-            ),
-          ),
-        ),
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
       );
-    });
-  }
+    }
 
-  List<Widget> _buildNeighborhoodLabels() {
-    final neighborhoods = [
-      {'name': 'DOMLUR', 'x': 0.15, 'y': 0.2},
-      {'name': 'INORANAGAR', 'x': 0.65, 'y': 0.15},
-      {'name': 'KORAMANGALA', 'x': 0.1, 'y': 0.7},
-      {'name': 'BELLANDUR', 'x': 0.75, 'y': 0.75},
-    ];
-
-    return neighborhoods.map((data) {
-      return Positioned(
-        left: MediaQuery.of(context).size.width * (data['x'] as double),
-        top: (data['y'] as double) * 150,
-        child: Text(
-          data['name'] as String,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary.withOpacity(0.7),
-            letterSpacing: 1,
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  // Build responder profile icons displayed on the map
-  List<Widget> _buildResponderMapMarkers() {
-    // Positions for responders on map (0.0-1.0 relative to map area)
-    final markerPositions = [
-      {'x': 0.25, 'y': 0.35, 'responderIndex': 0}, // Arjun N.
-      {'x': 0.70, 'y': 0.25, 'responderIndex': 1}, // Priya S.
-      {'x': 0.15, 'y': 0.65, 'responderIndex': 2}, // Rohit K.
-      {'x': 0.80, 'y': 0.55, 'responderIndex': 3}, // Meera T.
-    ];
-
-    return markerPositions.map((pos) {
-      final index = pos['responderIndex'] as int;
-      final responder = _responders[index];
-
-      return Positioned(
-        left: MediaQuery.of(context).size.width * (pos['x'] as double) - 20,
-        top: 30 + (pos['y'] as double) * 140,
-        child: GestureDetector(
-          onTap: () {
-            _showResponderDialog(responder);
-          },
+    if (_errorMessage != null || _sosLocation == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Blood type badge above avatar
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  responder['bloodType'] as String,
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+              const Icon(
+                Icons.location_off,
+                size: 64,
+                color: Colors.orange,
               ),
-              const SizedBox(height: 4),
-              // Avatar with shadow
-              Stack(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: CircleAvatar(
-                      backgroundImage: NetworkImage(responder['image'] as String),
-                      backgroundColor: AppColors.softPink,
-                    ),
-                  ),
-                  // Online indicator
-                  if (responder['isAvailable'] as bool)
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: AppColors.online,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
-                        ),
-                      ),
-                    ),
-                ],
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage ?? 'Location not available',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
               ),
             ],
           ),
         ),
       );
-    }).toList();
+    }
+
+    return Stack(
+      children: [
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: _sosLocation!,
+            initialZoom: 14,
+            minZoom: 4,
+            maxZoom: 18,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.all,
+            ),
+          ),
+          children: [
+            // OpenStreetMap tile layer
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.blood_donation',
+              maxZoom: 18,
+            ),
+            // Markers layer
+            MarkerLayer(markers: _markers),
+          ],
+        ),
+
+        // Map controls overlay
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: Column(
+            children: [
+              // Zoom in button
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  elevation: 2,
+                  child: IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: () {
+                      _mapController.move(
+                        _mapController.camera.center,
+                        _mapController.camera.zoom + 1,
+                      );
+                    },
+                  ),
+                ),
+              ),
+              // Zoom out button
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  elevation: 2,
+                  child: IconButton(
+                    icon: const Icon(Icons.remove),
+                    onPressed: () {
+                      _mapController.move(
+                        _mapController.camera.center,
+                        _mapController.camera.zoom - 1,
+                      );
+                    },
+                  ),
+                ),
+              ),
+              // Recenter button
+              Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                elevation: 2,
+                child: IconButton(
+                  icon: const Icon(Icons.my_location),
+                  onPressed: () {
+                    if (_sosLocation != null) {
+                      _mapController.move(_sosLocation!, 15);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildRespondersList() {
     return Container(
-      color: Colors.white,
+      color: const Color(0xFFF5F5F5),
       child: Column(
         children: [
           // List Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'Live Responders',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '$_respondedCount',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Sort Dropdown
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.border, width: 1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Newest first',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                    ],
+                Text(
+                  'Nearby Donors (${_responders.length})',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -549,74 +530,98 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
 
           // Responders List
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _responders.length,
-              itemBuilder: (context, index) {
-                final responder = _responders[index];
-                return _ResponderCard(
-                  name: responder['name'] as String,
-                  bloodType: responder['bloodType'] as String,
-                  units: responder['units'] as int,
-                  distance: responder['distance'] as double,
-                  image: responder['image'] as String,
-                  isAvailable: responder['isAvailable'] as bool,
-                  responseTime: responder['responseTime'] as String,
-                  onTap: () {
-                    _showResponderDialog(responder);
-                  },
-                );
-              },
-            ),
+            child: _responders.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: 48,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No donors nearby yet',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Your SOS is active and broadcasting',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    itemCount: _responders.length,
+                    itemBuilder: (context, index) {
+                      final responder = _responders[index];
+                      return _ResponderCard(
+                        name: responder['full_name'] as String? ?? 'Unknown',
+                        bloodType: responder['blood_group'] as String? ?? 'Unknown',
+                        distance: _calculateDistance(responder),
+                        image: responder['profile_picture'] as String?,
+                        isAvailable: responder['is_available_for_donation'] as bool? ?? true,
+                        onTap: () {
+                          _showResponderDialog(responder);
+                        },
+                      );
+                    },
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCancelButton() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      height: 52,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.primary, width: 2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextButton(
-        onPressed: () {
-          _showCancelSOSDialog();
-        },
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-        child: const Text(
-          'Cancel SOS',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ),
-    );
+  double _calculateDistance(Map<String, dynamic> responder) {
+    // Simple calculation - in production, use proper Haversine formula
+    if (_sosLocation == null) return 0;
+
+    final lat = responder['lat'] as double?;
+    final lng = responder['lng'] as double?;
+
+    if (lat == null || lng == null) return 0;
+
+    final dLat = (lat - _sosLocation!.latitude) * 111; // Approx km per degree latitude
+    final dLng = (lng - _sosLocation!.longitude) * 111 * (0.5 + 0.5 * (lat / 90).abs()); // Longitude varies by latitude
+
+    return sqrt(dLat * dLat + dLng * dLng);
   }
 
-  Widget _buildBottomIndicator() {
-    return Container(
-      height: 40,
-      color: const Color(0xFFD62828),
-      child: Center(
-        child: Text(
-          '3 SOS ACTIVE BROADCAST',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            letterSpacing: 2,
+  Widget _buildCancelButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        height: 50,
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () {
+            _showCancelSOSDialog();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFFB71C1C),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFFB71C1C), width: 2),
+            ),
+          ),
+          child: const Text(
+            'Cancel SOS',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -683,11 +688,19 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
           children: [
             CircleAvatar(
               radius: 40,
-              backgroundImage: NetworkImage(responder['image'] as String),
+              backgroundColor: AppColors.softPink,
+              child: Text(
+                (responder['full_name'] as String? ?? 'D')[0].toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
-              responder['name'] as String,
+              responder['full_name'] as String? ?? 'Unknown',
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -702,7 +715,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                responder['bloodType'] as String,
+                responder['blood_group'] as String? ?? 'Unknown',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -715,12 +728,14 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildDialogStat(
-                  '${responder['units']}',
-                  'Units',
+                  '${_calculateDistance(responder).toStringAsFixed(1)} km',
+                  'Distance',
                 ),
                 _buildDialogStat(
-                  '${responder['distance']} km',
-                  'Distance',
+                  (responder['is_available_for_donation'] as bool? ?? true)
+                      ? 'Available'
+                      : 'Busy',
+                  'Status',
                 ),
               ],
             ),
@@ -780,21 +795,17 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
 class _ResponderCard extends StatelessWidget {
   final String name;
   final String bloodType;
-  final int units;
   final double distance;
-  final String image;
+  final String? image;
   final bool isAvailable;
-  final String responseTime;
   final VoidCallback onTap;
 
   const _ResponderCard({
     required this.name,
     required this.bloodType,
-    required this.units,
     required this.distance,
-    required this.image,
+    this.image,
     required this.isAvailable,
-    required this.responseTime,
     required this.onTap,
   });
 
@@ -803,17 +814,16 @@ class _ResponderCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border, width: 1),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
@@ -823,17 +833,29 @@ class _ResponderCard extends StatelessWidget {
             Stack(
               children: [
                 CircleAvatar(
-                  radius: 28,
-                  backgroundImage: NetworkImage(image),
+                  radius: 24,
                   backgroundColor: AppColors.softPink,
+                  backgroundImage: image != null && image!.isNotEmpty
+                      ? NetworkImage(image!)
+                      : null,
+                  child: (image == null || image!.isEmpty)
+                      ? Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : 'D',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : null,
                 ),
                 if (isAvailable)
                   Positioned(
                     right: 0,
                     bottom: 0,
                     child: Container(
-                      width: 12,
-                      height: 12,
+                      width: 10,
+                      height: 10,
                       decoration: BoxDecoration(
                         color: AppColors.online,
                         shape: BoxShape.circle,
@@ -851,87 +873,52 @@ class _ResponderCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Name and Response Time
+                  // Name and Blood Type Row
                   Row(
                     children: [
                       Text(
                         name,
                         style: const TextStyle(
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      if (isAvailable)
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: AppColors.online,
-                            shape: BoxShape.circle,
-                          ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                      const Spacer(),
-                      Text(
-                        responseTime,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
+                        child: Text(
+                          bloodType,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
 
-                  // Blood Type Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      bloodType,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  // Units and Distance
+                  // Distance
                   Row(
                     children: [
-                      Icon(
-                        Icons.bloodtype_rounded,
-                        size: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$units Unit${units > 1 ? 's' : ''} available',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(
+                      const Icon(
                         Icons.location_on_rounded,
-                        size: 12,
+                        size: 11,
                         color: AppColors.textSecondary,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3),
                       Text(
-                        '${distance.toStringAsFixed(1)} km',
+                        '${distance.toStringAsFixed(1)} km away',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: Colors.grey.shade600,
                         ),
                       ),
                     ],
@@ -943,8 +930,8 @@ class _ResponderCard extends StatelessWidget {
             // Arrow Icon
             Icon(
               Icons.arrow_forward_ios_rounded,
-              size: 14,
-              color: AppColors.textSecondary,
+              size: 12,
+              color: Colors.grey.shade400,
             ),
           ],
         ),

@@ -131,6 +131,10 @@ class _NotificationsScreenApiState extends State<NotificationsScreenApi> {
         return Icons.chat_bubble_rounded;
       case 'sos_alert':
         return Icons.emergency_rounded;
+      case 'external_pledge':
+        return Icons.volunteer_activism_rounded;
+      case 'pledge_confirmed':
+        return Icons.check_circle_rounded;
       default:
         return Icons.notifications_rounded;
     }
@@ -140,6 +144,7 @@ class _NotificationsScreenApiState extends State<NotificationsScreenApi> {
     switch (type) {
       case 'sos_alert':
       case 'urgent_request':
+      case 'external_pledge':
         return Colors.red;
       case 'donation_completed':
       case 'thank_you':
@@ -389,9 +394,21 @@ class _NotificationsScreenApiState extends State<NotificationsScreenApi> {
             icon: _getNotificationIcon(notification['type'] as String?),
             color: _getNotificationColor(notification['type'] as String?),
             timestamp: _formatTimestamp(notification['created_at'] as String?),
-            onTap: () {
-              _markAsRead(notification['id'] as String);
-              _handleNotificationTap(notification);
+            onTap: () async {
+              // Mark as read before navigating
+              await _markAsRead(notification['id'] as String);
+              // Navigate to detail screen
+              final result = await Navigator.pushNamed(
+                context,
+                AppRoutes.notificationDetail,
+                arguments: notification,
+              );
+              // Handle delete action from detail screen
+              if (result == 'delete') {
+                _deleteNotification(notification['id'] as String);
+              }
+              // Reload notifications to reflect any changes
+              _loadNotifications();
             },
             onLongPress: () {
               _showNotificationOptions(notification['id'] as String);
@@ -410,6 +427,7 @@ class _NotificationsScreenApiState extends State<NotificationsScreenApi> {
       case 'blood_request_match':
       case 'urgent_request':
       case 'new_request':
+      case 'external_pledge':
         final requestId = data?['request_id'] as String?;
         if (requestId != null) {
           Navigator.pushNamed(context, '/blood-request-detail/$requestId');
@@ -630,6 +648,7 @@ class _NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isRead = notification['is_read'] as bool? ?? false;
+    final message = notification['message'] as String? ?? '';
 
     return GestureDetector(
       onTap: onTap,
@@ -685,7 +704,7 @@ class _NotificationCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    notification['message'] as String? ?? '',
+                    message,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: isRead ? FontWeight.w400 : FontWeight.w500,

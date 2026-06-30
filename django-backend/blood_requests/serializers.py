@@ -31,6 +31,7 @@ class BloodRequestSerializer(serializers.ModelSerializer):
             'location_lat',
             'location_lng',
             'expires_at',
+            'needed_by',  # When blood is needed by
             'status',
             'is_active',
             'created_at',
@@ -74,6 +75,13 @@ class BloodRequestSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     "Phone number must be in international format (+999999999) or local format starting with 0"
                 )
+        return value
+
+    def validate_needed_by(self, value):
+        """Validate needed_by date is in the future."""
+        from django.utils import timezone
+        if value and value < timezone.now():
+            raise serializers.ValidationError("Needed by date must be in the future.")
         return value
 
     def create(self, validated_data):
