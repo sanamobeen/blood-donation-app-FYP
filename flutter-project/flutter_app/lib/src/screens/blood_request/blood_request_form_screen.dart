@@ -21,6 +21,7 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
   // Selected values
   String _selectedBloodType = 'A+';
   String _selectedUrgency = 'normal';
+  DateTime? _selectedNeededByDate;
 
   // Location data
   SelectedLocation? _selectedLocation;
@@ -154,6 +155,12 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
                   _buildSectionTitle('Urgency Level*'),
                   const SizedBox(height: 12),
                   _buildUrgencySelector(),
+                  const SizedBox(height: 20),
+
+                  // Needed By Date
+                  _buildSectionTitle('Needed By*'),
+                  const SizedBox(height: 12),
+                  _buildNeededByDatePicker(),
                   const SizedBox(height: 20),
 
                   // Contact Number
@@ -390,6 +397,125 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
     );
   }
 
+  Widget _buildNeededByDatePicker() {
+    return InkWell(
+      onTap: _pickNeededByDate,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border, width: 1),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.calendar_today,
+              size: 20,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _selectedNeededByDate == null
+                    ? 'Select date when blood is needed by*'
+                    : '${_formatDate(_selectedNeededByDate!)} ${_formatTime(_selectedNeededByDate!)}',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: _selectedNeededByDate == null
+                      ? AppColors.textSecondary.withValues(alpha: 0.8)
+                      : AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (_selectedNeededByDate != null)
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () {
+                  setState(() => _selectedNeededByDate = null);
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  String _formatTime(DateTime date) {
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  Future<void> _pickNeededByDate() async {
+    final now = DateTime.now();
+    final firstDate = now;
+    final lastDate = now.add(const Duration(days: 30)); // Max 30 days from now
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedNeededByDate ?? now.add(const Duration(hours: 6)),
+      firstDate: firstDate,
+      lastDate: lastDate,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null && mounted) {
+      // Now pick time
+      final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: _selectedNeededByDate != null
+            ? TimeOfDay.fromDateTime(_selectedNeededByDate!)
+            : TimeOfDay.now(),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: AppColors.primary,
+                onPrimary: Colors.white,
+                surface: Colors.white,
+                onSurface: AppColors.textPrimary,
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (pickedTime != null && mounted) {
+        setState(() {
+          _selectedNeededByDate = DateTime(
+            pickedDate.year,
+            pickedDate.month,
+            pickedDate.day,
+            pickedTime.hour,
+            pickedTime.minute,
+          );
+        });
+      }
+    }
+  }
+
   Widget _buildNotesField() {
     return TextField(
       controller: _notesController,
@@ -574,6 +700,10 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
       _showError('Please enter contact number');
       return;
     }
+    if (_selectedNeededByDate == null) {
+      _showError('Please select when blood is needed by');
+      return;
+    }
     if (_selectedLocation == null) {
       _showError('Please select location');
       return;
@@ -612,6 +742,7 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
         location: _selectedLocation!.fullAddress,
         locationLat: double.parse(_selectedLocation!.latitude.toStringAsFixed(6)),
         locationLng: double.parse(_selectedLocation!.longitude.toStringAsFixed(6)),
+        neededBy: _selectedNeededByDate!,
         additionalNotes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),

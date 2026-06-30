@@ -5,8 +5,8 @@ from .models import BloodRequest, DonorResponse
 
 @admin.register(BloodRequest)
 class BloodRequestAdmin(admin.ModelAdmin):
-    list_display = ('share_id_link', 'patient_name', 'blood_group', 'units_needed', 'urgency_level', 'status', 'has_location', 'created_at')
-    list_filter = ('status', 'urgency_level', 'blood_group', 'created_at')
+    list_display = ('share_id_link', 'patient_name', 'blood_group', 'units_needed', 'urgency_level', 'needed_by', 'status', 'has_location', 'created_at')
+    list_filter = ('status', 'urgency_level', 'blood_group', 'created_at', 'needed_by')
     search_fields = ('patient_name', 'hospital_name', 'location', 'share_id')
     readonly_fields = ('share_id', 'public_page_link', 'quiz_responses_display', 'created_at', 'updated_at', 'responders_count', 'units_pledged', 'units_received')
     ordering = ('-created_at',)
@@ -22,7 +22,7 @@ class BloodRequestAdmin(admin.ModelAdmin):
             'fields': ('contact_number', 'requested_by')
         }),
         ('Status & Urgency', {
-            'fields': ('status', 'urgency_level', 'is_active')
+            'fields': ('status', 'urgency_level', 'needed_by', 'is_active')
         }),
         ('Patient Quiz Responses', {
             'fields': ('quiz_responses_display',),

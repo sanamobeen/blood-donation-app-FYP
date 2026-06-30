@@ -15,6 +15,7 @@ import 'screens/donations/my_donations_screen.dart';
 // import 'screens/home/home_screen.dart'; // Removed - using MainNavigationScreen instead
 import 'screens/messages/messages_screen.dart';
 import 'screens/notifications/notifications_screen_api.dart';
+import 'screens/notifications/notification_detail_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/onboarding/onboarding_screen_2.dart';
 import 'screens/onboarding/onboarding_screen3.dart';
@@ -30,7 +31,7 @@ import 'screens/profile/edit_profile_screen.dart';
 import 'screens/requests/my_requests_screen.dart';
 import 'screens/requests/nearby_requests_screen.dart';
 import 'screens/role_selection/role_selection_screen.dart';
-import 'screens/sos/sos_screen.dart';
+import 'screens/sos/sos_screen_api.dart';
 import 'screens/sos/sos_active_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -70,6 +71,7 @@ class AppRoutes {
   static const messages = '/messages';
   static const chatList = '/chat-list';
   static const notifications = '/notifications';
+  static const notificationDetail = '/notification-detail';
   static const profile = '/profile';
   static const editProfile = '/edit-profile';
   static const patientHome = '/patient-home';
@@ -102,7 +104,7 @@ class AppRoutes {
     profileSetup: (context) => const ProfileSetupScreen(),
     home: (context) => const MainNavigationScreen(), // Redirect to MainNavigationScreen
     mainNavigation: (context) => const MainNavigationScreen(),
-    sos: (context) => const SOSScreen(),
+    sos: (context) => const SOSScreenApi(),
     sosActive: (context) => const SOSActiveScreen(),
     findDonors: (context) => const FindDonorsScreen(),
     unifiedMap: (context) => const UnifiedMapScreen(),
@@ -116,6 +118,10 @@ class AppRoutes {
     messages: (context) => const MessagesScreen(),
     chatList: (context) => const MessagesScreen(),
     notifications: (context) => const NotificationsScreenApi(),
+    notificationDetail: (context) {
+      final notification = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+      return NotificationDetailScreen(notification: notification);
+    },
     myDonations: (context) => const MyDonationsScreen(),
     profile: (context) => const ProfileScreen(),
     editProfile: (context) => const EditProfileScreen(),

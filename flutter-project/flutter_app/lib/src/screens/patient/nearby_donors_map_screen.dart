@@ -60,11 +60,20 @@ class _NearbyDonorsMapScreenState extends State<NearbyDonorsMapScreen> {
 
     try {
       // Get current user profile to check role
-      final profile = await ApiService.getProfile();
+      final profile = await ApiService.getProfile().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Profile request timeout');
+        },
+      );
 
       if (profile['success'] == true && profile['data'] != null) {
         final userData = profile['data'];
-        final userRole = userData['role'] ?? userData['profile']?['role'];
+        final userRole = userData['user']?['role'] ??
+                        userData['role'];
+
+        print('DEBUG: Nearby donors role check - Role: $userRole');
+        print('DEBUG: Profile data keys: ${userData.keys.toList()}');
 
         // Only patients should access this screen
         if (userRole != 'patient') {
@@ -74,14 +83,18 @@ class _NearbyDonorsMapScreenState extends State<NearbyDonorsMapScreen> {
           });
           return;
         }
+      } else {
+        // Profile fetch failed but allow to continue anyway
+        print('DEBUG: Profile fetch failed, continuing anyway');
       }
 
-      // If role check passes, initialize map
+      // If role check passes (or fails gracefully), initialize map
       await _initializeMap();
     } catch (e) {
+      print('DEBUG: Role check error: $e');
       setState(() {
         _isCheckingRole = false;
-        _errorMessage = 'Error: $e';
+        _errorMessage = 'Error initializing: $e';
       });
     }
   }
@@ -94,24 +107,37 @@ class _NearbyDonorsMapScreenState extends State<NearbyDonorsMapScreen> {
     });
 
     try {
+      print('DEBUG: Initializing map...');
+
       // Get current location
       await _getCurrentLocation();
 
       if (_currentLat != null && _currentLng != null) {
         // Set initial camera position
         _initialCenter = LatLng(_currentLat!, _currentLng!);
+        print('DEBUG: Map center set to $_initialCenter');
 
         // Fetch nearby donors
         await _fetchNearbyDonors();
       } else {
+        print('DEBUG: No location available, showing error');
         setState(() {
-          _errorMessage = 'Could not get your location. Please enable location services.';
+          _errorMessage = 'Could not get your location.\n\nPlease enable location services and GPS to see nearby donors on the map.';
           _isLoading = false;
         });
       }
     } catch (e) {
+      print('DEBUG: Map initialization error: $e');
       setState(() {
-        _errorMessage = 'Error: $e';
+        _errorMessage = 'Error initializing map: $e';
+        _isLoading = false;
+      });
+    }
+
+    // Ensure loading state is cleared even if all else fails
+    if (mounted && _isLoading) {
+      print('DEBUG: Force clearing loading state');
+      setState(() {
         _isLoading = false;
       });
     }
@@ -119,30 +145,44 @@ class _NearbyDonorsMapScreenState extends State<NearbyDonorsMapScreen> {
 
   Future<void> _getCurrentLocation() async {
     try {
+      print('DEBUG: Getting current location...');
+
       // Check location permission
       LocationPermission permission = await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
+          print('DEBUG: Location permission denied');
           setState(() {
-            _errorMessage = 'Location permissions are denied';
+            _errorMessage = 'Location permissions are denied.\n\nPlease enable location services to see nearby donors on the map.';
+            _isLoading = false;
           });
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
+        print('DEBUG: Location permission permanently denied');
         setState(() {
-          _errorMessage = 'Location permissions are permanently denied';
+          _errorMessage = 'Location permissions are permanently denied.\n\nPlease enable location services in your app settings to see nearby donors.';
+          _isLoading = false;
         });
         return;
       }
 
-      // Get current position
+      // Get current position with timeout
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Location fetch timeout - please ensure GPS is enabled');
+        },
       );
+
+      print('DEBUG: Got location: ${position.latitude}, ${position.longitude}');
 
       setState(() {
         _currentLat = position.latitude;
@@ -153,8 +193,10 @@ class _NearbyDonorsMapScreenState extends State<NearbyDonorsMapScreen> {
       // Start GPS tracking stream
       _startLocationTracking();
     } catch (e) {
+      print('DEBUG: Location error: $e');
       setState(() {
-        _errorMessage = 'Error getting location: $e';
+        _errorMessage = 'Could not get your location.\n\nPlease enable location services and GPS to see nearby donors on the map.\n\nError: $e';
+        _isLoading = false;
       });
     }
   }
@@ -234,20 +276,37 @@ class _NearbyDonorsMapScreenState extends State<NearbyDonorsMapScreen> {
   }
 
   Future<void> _fetchNearbyDonors() async {
-    if (_currentLat == null || _currentLng == null) return;
+    if (_currentLat == null || _currentLng == null) {
+      print('DEBUG: Cannot fetch donors - no location');
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
 
     try {
+      print('DEBUG: Fetching nearby donors at lat: $_currentLat, lng: $_currentLng, radius: $_searchRadius');
+
       final response = await ApiService.getNearbyDonors(
         lat: _currentLat!,
         lng: _currentLng!,
         radius: _searchRadius,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('Donors fetch timeout');
+        },
       );
+
+      print('DEBUG: Donors response: $response');
 
       if (mounted) {
         if (response['success'] == true && response['data'] != null) {
           final data = response['data'];
           final donorsList = (data['donors'] as List? ?? [])
               .cast<Map<String, dynamic>>();
+
+          print('DEBUG: Found ${donorsList.length} donors');
 
           setState(() {
             _nearbyDonors = donorsList;
@@ -257,16 +316,18 @@ class _NearbyDonorsMapScreenState extends State<NearbyDonorsMapScreen> {
           // Create markers for each donor
           _createMarkers();
         } else {
+          print('DEBUG: Donors fetch failed: ${response['message']}');
           setState(() {
-            _errorMessage = response['message'] ?? 'Failed to fetch nearby donors';
+            _nearbyDonors = []; // Empty but not error state
             _isLoading = false;
           });
         }
       }
     } catch (e) {
+      print('DEBUG: Donors fetch error: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Error: $e';
+          _nearbyDonors = []; // Empty but not error state
           _isLoading = false;
         });
       }

@@ -641,6 +641,7 @@ class ApiService {
     required int unitsNeeded,
     required String urgencyLevel,
     required String contactNumber,
+    required DateTime neededBy,
     String? hospitalName,
     String? location,
     String? additionalNotes,
@@ -665,6 +666,7 @@ class ApiService {
           if (additionalNotes != null && additionalNotes.isNotEmpty) 'additional_notes': additionalNotes,
           if (locationLat != null && locationLng != null) 'location_lat': locationLat,
           if (locationLat != null && locationLng != null) 'location_lng': locationLng,
+          if (neededBy != null) 'needed_by': neededBy.toIso8601String(),
           if (quizResponses != null) 'quiz_responses': quizResponses,
         }),
       );

@@ -84,15 +84,15 @@ class SOSRequest(models.Model):
         help_text="Full hospital address"
     )
     hospital_lat = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
+        max_digits=10,
+        decimal_places=7,
         null=True,
         blank=True,
         help_text="Hospital latitude"
     )
     hospital_lng = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
+        max_digits=10,
+        decimal_places=7,
         null=True,
         blank=True,
         help_text="Hospital longitude"

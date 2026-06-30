@@ -77,6 +77,13 @@ class Notification(models.Model):
         help_text="ID of related conversation"
     )
 
+    # Additional data (JSON field for extra information)
+    data = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Additional notification data (donor info, location, etc.)"
+    )
+
     # Status
     is_read = models.BooleanField(
         default=False,

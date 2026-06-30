@@ -15,6 +15,7 @@ class BloodRequest {
   final double? locationLat;
   final double? locationLng;
   final String? additionalNotes;
+  final DateTime neededBy; // Required: When blood is needed by
   final String status;
   final bool isActive;
   final DateTime createdAt;
@@ -39,6 +40,7 @@ class BloodRequest {
     this.locationLat,
     this.locationLng,
     this.additionalNotes,
+    required this.neededBy,
     required this.status,
     required this.isActive,
     required this.createdAt,
@@ -90,10 +92,11 @@ class BloodRequest {
       locationLat: _parseNullableDouble(json['location_lat']),
       locationLng: _parseNullableDouble(json['location_lng']),
       additionalNotes: json['additional_notes']?.toString(),
+      neededBy: _parseRequiredDateTime(json['needed_by']),
       status: json['status']?.toString() ?? 'pending',
       isActive: json['is_active'] is bool ? json['is_active'] as bool : json['is_active']?.toString() == 'true',
-      createdAt: _parseDateTime(json['created_at']),
-      updatedAt: _parseDateTime(json['updated_at']),
+      createdAt: _parseRequiredDateTime(json['created_at']),
+      updatedAt: _parseRequiredDateTime(json['updated_at']),
       requesterName: json['requester_name']?.toString(),
       requestedById: json['requested_by_id']?.toString(),
       requesterProfilePicture: json['requester_profile_picture']?.toString(),
@@ -101,8 +104,22 @@ class BloodRequest {
     );
   }
 
-  /// Safe DateTime parsing with fallback
-  static DateTime _parseDateTime(dynamic value) {
+  /// Safe DateTime parsing with fallback (returns null for optional dates)
+  static DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// Safe DateTime parsing with fallback for required fields (returns DateTime.now() if null)
+  static DateTime _parseRequiredDateTime(dynamic value) {
     if (value == null) return DateTime.now();
     if (value is DateTime) return value;
     if (value is String) {
@@ -196,6 +213,7 @@ class BloodRequest {
     double? locationLat,
     double? locationLng,
     String? additionalNotes,
+    DateTime? neededBy,
     String? status,
     bool? isActive,
     DateTime? createdAt,
@@ -218,6 +236,7 @@ class BloodRequest {
       locationLat: locationLat ?? this.locationLat,
       locationLng: locationLng ?? this.locationLng,
       additionalNotes: additionalNotes ?? this.additionalNotes,
+      neededBy: neededBy ?? this.neededBy,
       status: status ?? this.status,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,

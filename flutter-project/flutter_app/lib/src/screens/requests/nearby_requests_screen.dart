@@ -29,6 +29,9 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
   Set<String> _pledgedRequestIds = {}; // Track request IDs user has pledged to
   String? _currentUserId; // Track current user ID to prevent self-pledges
 
+  // SOS requests
+  List<Map<String, dynamic>> _sosRequests = [];
+
   // User's blood group for filtering
   String? _userBloodGroup;
   List<String> _compatibleBloodGroups = [];
@@ -335,16 +338,28 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
     });
 
     try {
-      // Fetch real blood requests from backend
-      final response = await ApiService.getBloodRequests(status: 'pending');
+      // Fetch regular blood requests from backend
+      final bloodRequestsResponse = await ApiService.getBloodRequests(status: 'pending');
+
+      // Fetch active SOS requests
+      final sosResponse = await ApiService.getActiveSosRequests(
+        lat: _donorProfileLat ?? 31.5204,
+        lng: _donorProfileLng ?? 74.3587,
+      );
 
       if (mounted) {
         setState(() {
-          _requestsResponse = response;
+          _requestsResponse = bloodRequestsResponse;
           _isLoading = false;
-          if (!response.success) {
-            _errorMessage = response.message;
+          if (!bloodRequestsResponse.success) {
+            _errorMessage = bloodRequestsResponse.message;
           }
+
+          // Store SOS requests separately for display
+          _sosRequests = sosResponse['success'] == true
+              ? (sosResponse['data']?['requests'] as List? ?? [])
+                  .cast<Map<String, dynamic>>()
+              : [];
         });
       }
     } catch (e) {
@@ -352,6 +367,7 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
         setState(() {
           _isLoading = false;
           _errorMessage = 'Failed to load requests';
+          _sosRequests = [];
         });
       }
     }
@@ -397,6 +413,45 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
     return _filteredRequests
         .where((r) => r.locationLat != null && r.locationLng != null)
         .toList();
+  }
+
+  // Get combined list of all requests (SOS + regular blood requests)
+  // Returns a list of maps with type indicator
+  List<Map<String, dynamic>> get _allRequests {
+    final List<Map<String, dynamic>> combined = [];
+
+    // Add SOS requests first (highest priority)
+    for (var sos in _sosRequests) {
+      // Check blood type compatibility
+      if (_compatibleBloodGroups.isEmpty ||
+          _compatibleBloodGroups.contains(sos['blood_type'])) {
+        combined.add({
+          'type': 'sos',
+          'data': sos,
+        });
+      }
+    }
+
+    // Add regular blood requests
+    for (var request in _filteredRequests) {
+      combined.add({
+        'type': 'blood_request',
+        'data': request,
+      });
+    }
+
+    // Sort by time (latest first)
+    combined.sort((a, b) {
+      final aTime = a['type'] == 'sos'
+          ? DateTime.parse(a['data']['created_at'])
+          : (a['data'] as BloodRequest).createdAt;
+      final bTime = b['type'] == 'sos'
+          ? DateTime.parse(b['data']['created_at'])
+          : (b['data'] as BloodRequest).createdAt;
+      return bTime.compareTo(aTime);
+    });
+
+    return combined;
   }
 
   String _getTimeAgo(DateTime dateTime) {
@@ -772,49 +827,89 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: _filteredRequests.length,
+      itemCount: _allRequests.length,
       itemBuilder: (context, index) {
-        final request = _filteredRequests[index];
-        final priorityColor = _getPriorityColor(request.urgencyLevel);
+        final requestItem = _allRequests[index];
+        final isSOS = requestItem['type'] == 'sos';
+        final request = requestItem['data'];
 
-        // Calculate distance using donor's REGISTERED location
-        String distanceText = 'Location unknown';
-        if (_donorProfileLat != null && _donorProfileLng != null &&
-            request.locationLat != null && request.locationLng != null) {
-          final distanceKm = _calculateDistanceInKm(
-            _donorProfileLat!,
-            _donorProfileLng!,
-            request.locationLat!,
-            request.locationLng!,
+        if (isSOS) {
+          // Show SOS request card with special styling
+          final sosData = request as Map<String, dynamic>;
+          final bloodType = sosData['blood_type'] ?? 'Unknown';
+          final hospitalName = sosData['hospital_name'] ?? 'Unknown Hospital';
+          final patientName = sosData['requester_name'] ?? 'Patient';
+          final unitsNeeded = sosData['units_needed'] ?? 1;
+          final respondersCount = sosData['responders_count'] ?? 0;
+          final createdAt = DateTime.parse(sosData['created_at']);
+
+          // Calculate distance
+          String distanceText = 'Nearby';
+          if (_donorProfileLat != null && _donorProfileLng != null &&
+              sosData['hospital_lat'] != null && sosData['hospital_lng'] != null) {
+            final distanceKm = _calculateDistanceInKm(
+              _donorProfileLat!,
+              _donorProfileLng!,
+              sosData['hospital_lat'],
+              sosData['hospital_lng'],
+            );
+            distanceText = _formatDistance(distanceKm);
+          }
+
+          return _SOSRequestCard(
+            name: patientName,
+            bloodType: bloodType,
+            hospital: hospitalName,
+            distance: distanceText,
+            time: _getTimeAgo(createdAt),
+            unitsNeeded: unitsNeeded,
+            respondersCount: respondersCount,
+            sosId: sosData['id'],
           );
-          distanceText = _formatDistance(distanceKm);
-        }
+        } else {
+          // Show regular blood request card
+          final bloodRequest = request as BloodRequest;
+          final priorityColor = _getPriorityColor(bloodRequest.urgencyLevel);
 
-        return _RequestCard(
-          name: request.patientName,
-          initials: _getInitials(request.patientName),
-          bloodType: request.bloodGroup,
-          hospital: request.hospitalName ?? 'Location specified',
-          distance: distanceText,
-          time: _getTimeAgo(request.createdAt),
-          priority: request.urgencyLevel,
-          priorityColor: priorityColor,
-          requestId: request.id,
-          unitsNeeded: request.unitsNeeded,
-          hasPledged: _pledgedRequestIds.contains(request.id),
-          isOwnRequest: _currentUserId != null && request.requestedById == _currentUserId,
+          // Calculate distance using donor's REGISTERED location
+          String distanceText = 'Location unknown';
+          if (_donorProfileLat != null && _donorProfileLng != null &&
+              bloodRequest.locationLat != null && bloodRequest.locationLng != null) {
+            final distanceKm = _calculateDistanceInKm(
+              _donorProfileLat!,
+              _donorProfileLng!,
+              bloodRequest.locationLat!,
+              bloodRequest.locationLng!,
+            );
+            distanceText = _formatDistance(distanceKm);
+          }
+
+          return _RequestCard(
+            name: bloodRequest.patientName,
+            initials: _getInitials(bloodRequest.patientName),
+            bloodType: bloodRequest.bloodGroup,
+            hospital: bloodRequest.hospitalName ?? 'Location specified',
+            distance: distanceText,
+            time: _getTimeAgo(bloodRequest.createdAt),
+            priority: bloodRequest.urgencyLevel,
+            priorityColor: priorityColor,
+            requestId: bloodRequest.id,
+            unitsNeeded: bloodRequest.unitsNeeded,
+            hasPledged: _pledgedRequestIds.contains(bloodRequest.id),
+            isOwnRequest: _currentUserId != null && bloodRequest.requestedById == _currentUserId,
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => BloodRequestDetailScreen(
-                  requestId: request.id,
+                  requestId: bloodRequest.id,
                 ),
               ),
             );
           },
-          onPledge: () => _handlePledge(request),
+          onPledge: () => _handlePledge(bloodRequest),
         );
+        }
       },
     );
   }
@@ -1494,6 +1589,230 @@ class _RequestCard extends StatelessWidget {
                     : AppColors.primary,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: AppColors.textSecondary,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SOSRequestCard extends StatelessWidget {
+  final String name;
+  final String bloodType;
+  final String hospital;
+  final String distance;
+  final String time;
+  final int unitsNeeded;
+  final int respondersCount;
+  final String sosId;
+
+  const _SOSRequestCard({
+    required this.name,
+    required this.bloodType,
+    required this.hospital,
+    required this.distance,
+    required this.time,
+    required this.unitsNeeded,
+    required this.respondersCount,
+    required this.sosId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEBEE),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD62828), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD62828).withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // SOS Badge Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD62828),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.emergency,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'SOS EMERGENCY',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Tap to respond now',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Main content
+          Row(
+            children: [
+              // Blood Type Icon
+              Container(
+                width: 50,
+                height: 50,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFD62828),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    bloodType,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Info Section
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.local_hospital,
+                          size: 12,
+                          color: Color(0xFFD62828),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            hospital,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 12, color: AppColors.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          distance,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Icon(Icons.access_time, size: 12, color: AppColors.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          time,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD62828),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '$unitsNeeded unit${unitsNeeded > 1 ? "s" : ""}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Respond Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // TODO: Navigate to SOS response screen
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('SOS response feature coming soon!'),
+                    backgroundColor: Color(0xFFD62828),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.emergency_share, size: 16),
+              label: Text(
+                'Respond to SOS - Help Now!',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD62828),
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),

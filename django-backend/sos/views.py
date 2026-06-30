@@ -251,10 +251,74 @@ def create_sos(request):
             sos_request = serializer.save()
             logger.info(f"New SOS request created: {sos_request.id} by {request.user.email}")
 
+            # Send notifications to nearby compatible donors
+            try:
+                from account.fcm_service import (
+                    get_compatible_blood_types,
+                    calculate_distance,
+                    send_batch_sos_notifications
+                )
+                from account.models import UserProfile
+
+                # Get compatible blood types
+                compatible_types = get_compatible_blood_types(sos_request.blood_type)
+                logger.info(f"Compatible blood types for {sos_request.blood_type}: {compatible_types}")
+
+                # Query eligible donors with location
+                eligible_donors = []
+                radius_km = 50  # Search within 50km
+
+                for donor in UserProfile.objects.filter(
+                    blood_group__in=compatible_types,
+                    fcm_token__isnull=False,
+                    user__is_active=True
+                ).exclude(fcm_token='').select_related('user').all():
+
+                    # Check if donor has location
+                    if not donor.location_lat or not donor.location_lng:
+                        continue
+
+                    # Calculate distance from donor to hospital
+                    distance = calculate_distance(
+                        donor.location_lat,
+                        donor.location_lng,
+                        sos_request.hospital_lat,
+                        sos_request.hospital_lng
+                    )
+
+                    # Filter by radius
+                    if distance <= radius_km:
+                        eligible_donors.append({
+                            'profile': donor,
+                            'distance': distance,
+                            'fcm_token': donor.fcm_token
+                        })
+
+                # Send notifications to eligible donors
+                if eligible_donors:
+                    notification_result = send_batch_sos_notifications(
+                        donor_tokens=[d['fcm_token'] for d in eligible_donors],
+                        blood_type=sos_request.blood_type,
+                        hospital_name=sos_request.hospital_name,
+                        hospital_address=sos_request.hospital_address,
+                        sos_id=str(sos_request.id),
+                        urgency='critical',
+                        donor_distances={d['fcm_token']: d['distance'] for d in eligible_donors}
+                    )
+                    success_count = notification_result.get('success_count', 0)
+                    logger.info(f"Sent {success_count} SOS notifications to nearby donors")
+                else:
+                    logger.warning(f"No eligible donors found within {radius_km}km")
+
+            except Exception as notification_error:
+                # Log error but don't fail the SOS creation
+                logger.error(f"Failed to send SOS notifications: {str(notification_error)}", exc_info=True)
+
             return success_response(
                 message='SOS request created successfully. Help is on the way!',
                 data={
-                    'sos_request': PublicSOSRequestSerializer(sos_request).data
+                    'sos_request': PublicSOSRequestSerializer(sos_request).data,
+                    'notified_donors': len(eligible_donors) if 'eligible_donors' in locals() else 0,
                 },
                 status_code=status.HTTP_201_CREATED
             )
