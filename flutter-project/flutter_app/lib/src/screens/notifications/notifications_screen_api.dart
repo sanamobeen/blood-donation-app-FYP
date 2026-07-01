@@ -560,65 +560,24 @@ class _NotificationsScreenApiState extends State<NotificationsScreenApi> {
       selectedIndex: _selectedTabIndex,
       onItemTapped: (index) {
         setState(() => _selectedTabIndex = index);
-        final routes = [
-          AppRoutes.home,
-          AppRoutes.nearbyRequests,
-          AppRoutes.findDonors,
-          AppRoutes.messages,
-          AppRoutes.settings,
-        ];
-        if (routes[index].isNotEmpty) {
-          Navigator.pushReplacementNamed(context, routes[index]);
-        }
-      },
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedTabIndex == index;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTabIndex = index;
-        });
-        // Handle navigation
+        // Routes: 0=Home, 1=Request, 2=Chat, 3=Profile
         switch (index) {
           case 0:
             Navigator.popUntil(context, (route) => route.isFirst);
             break;
           case 1:
-            Navigator.popAndPushNamed(context, '/nearby-requests');
+            Navigator.popAndPushNamed(context, AppRoutes.nearbyRequests);
             break;
           case 2:
-            Navigator.popAndPushNamed(context, '/nearby-donors-map');
+            // Navigate to Messages (Chat)
+            Navigator.popAndPushNamed(context, AppRoutes.messages);
             break;
           case 3:
-            Navigator.popAndPushNamed(context, '/messages');
-            break;
-          case 4:
-            Navigator.popAndPushNamed(context, '/settings');
+            // Navigate to Settings (Profile)
+            Navigator.popAndPushNamed(context, AppRoutes.settings);
             break;
         }
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

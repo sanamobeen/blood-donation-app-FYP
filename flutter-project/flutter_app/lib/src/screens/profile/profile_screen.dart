@@ -434,28 +434,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       selectedIndex: _selectedTabIndex,
       onItemTapped: (index) {
         setState(() => _selectedTabIndex = index);
-        final routes = [
-          AppRoutes.home,
-          AppRoutes.nearbyRequests,
-          AppRoutes.findDonors,
-          AppRoutes.messages,
-          AppRoutes.settings,
-        ];
-        if (routes[index].isNotEmpty) {
-          Navigator.pushReplacementNamed(context, routes[index]);
-        }
-      },
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedTabIndex == index;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTabIndex = index;
-        });
-        // Handle navigation based on index
+        // Routes: 0=Home, 1=Request, 2=Chat, 3=Profile
         switch (index) {
           case 0:
             Navigator.pushReplacementNamed(context, AppRoutes.home);
@@ -464,37 +443,15 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             Navigator.pushReplacementNamed(context, AppRoutes.nearbyRequests);
             break;
           case 2:
-            // Navigate to Map
-            Navigator.pushNamed(context, AppRoutes.nearbyDonorsMap);
-            break;
-          case 3:
+            // Navigate to Messages (Chat)
             Navigator.pushReplacementNamed(context, AppRoutes.messages);
             break;
-          case 4:
-            // Navigate to Settings (Profile page now navigates to Settings)
+          case 3:
+            // Already on Profile - refresh
             Navigator.pushReplacementNamed(context, AppRoutes.settings);
             break;
         }
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

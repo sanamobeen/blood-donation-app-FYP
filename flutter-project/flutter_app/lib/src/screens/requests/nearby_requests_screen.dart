@@ -1269,7 +1269,7 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
     return UnifiedBottomNavigationBar(
       selectedIndex: 1, // Requests is index 1
       onItemTapped: (index) {
-        // Handle navigation based on index
+        // Handle navigation based on index: 0=Home, 1=Request, 2=Chat, 3=Profile
         switch (index) {
           case 0:
             Navigator.pushReplacementNamed(context, AppRoutes.home);
@@ -1279,15 +1279,11 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
             Navigator.pushReplacementNamed(context, AppRoutes.nearbyRequests);
             break;
           case 2:
-            // Navigate to Map (Find Donors)
-            Navigator.pushReplacementNamed(context, AppRoutes.findDonors);
-            break;
-          case 3:
             // Navigate to Messages (Chat)
             Navigator.pushReplacementNamed(context, AppRoutes.messages);
             break;
-          case 4:
-            // Navigate to Settings (Profile)
+          case 3:
+            // Navigate to Profile (Settings)
             Navigator.pushReplacementNamed(context, AppRoutes.settings);
             break;
         }
@@ -1295,54 +1291,6 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = index == 1; // Always show Requests as selected
-    return GestureDetector(
-      onTap: () {
-        // Handle navigation based on index
-        switch (index) {
-          case 0:
-            Navigator.pushReplacementNamed(context, AppRoutes.home);
-            break;
-          case 1:
-            // Already on Requests - refresh
-            Navigator.pushReplacementNamed(context, AppRoutes.nearbyRequests);
-            break;
-          case 2:
-            // Navigate to Map
-            Navigator.pushNamed(context, AppRoutes.nearbyDonorsMap);
-            break;
-          case 3:
-            // Navigate to Messages
-            Navigator.pushReplacementNamed(context, AppRoutes.messages);
-            break;
-          case 4:
-            // Navigate to Settings (Profile)
-            Navigator.pushReplacementNamed(context, AppRoutes.settings);
-            break;
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _FilterButton extends StatelessWidget {

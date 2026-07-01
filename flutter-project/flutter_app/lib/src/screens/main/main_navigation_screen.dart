@@ -1885,7 +1885,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ),
             TextButton(
-              onPressed: () => Navigator.pushNamed(context, AppRoutes.findDonors),
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.nearbyDonorsMap),
               child: const Text('See All'),
             ),
           ],

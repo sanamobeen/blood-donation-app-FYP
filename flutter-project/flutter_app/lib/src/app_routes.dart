@@ -22,7 +22,6 @@ import 'screens/onboarding/onboarding_screen3.dart';
 import 'screens/patient_home/patient_home_screen.dart';
 import 'screens/quiz/health_eligibility_quiz_screen.dart';
 import 'screens/donors/donor_profile_screen.dart';
-import 'screens/donors/find_donors_screen.dart';
 import 'screens/map/unified_map_screen.dart';
 import 'screens/patient/nearby_donors_map_screen.dart';
 import 'screens/patient/all_responding_donors_screen.dart';
@@ -63,7 +62,6 @@ class AppRoutes {
   static const sosActive = '/sos-active';
   static const myDonations = '/my-donations';
   static const donorProfile = '/donor-profile';
-  static const findDonors = '/find-donors';
   static const unifiedMap = '/unified-map';
   static const nearbyDonorsMap = '/nearby-donors-map';
   static const myRequests = '/my-requests';
@@ -106,7 +104,6 @@ class AppRoutes {
     mainNavigation: (context) => const MainNavigationScreen(),
     sos: (context) => const SOSScreenApi(),
     sosActive: (context) => const SOSActiveScreen(),
-    findDonors: (context) => const FindDonorsScreen(),
     unifiedMap: (context) => const UnifiedMapScreen(),
     donorProfile: (context) {
       final donor = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
