@@ -362,7 +362,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
     return UnifiedBottomNavigationBar(
       selectedIndex: 1, // Requests is index 1
       onItemTapped: (index) {
-        // Handle navigation with correct 5-item nav indices
+        // Handle navigation with 4-item nav: 0=Home, 1=Request, 2=Chat, 3=Profile
         switch (index) {
           case 0: // Home
             Navigator.pushReplacementNamed(context, AppRoutes.home);
@@ -370,13 +370,10 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
           case 1: // Requests - already here
             Navigator.pushReplacementNamed(context, AppRoutes.myRequests);
             break;
-          case 2: // Map (Find Donors)
-            Navigator.pushReplacementNamed(context, AppRoutes.findDonors);
-            break;
-          case 3: // Chat/Messages
+          case 2: // Chat/Messages
             Navigator.pushReplacementNamed(context, AppRoutes.messages);
             break;
-          case 4: // Profile/Settings
+          case 3: // Profile/Settings
             Navigator.pushReplacementNamed(context, AppRoutes.settings);
             break;
         }

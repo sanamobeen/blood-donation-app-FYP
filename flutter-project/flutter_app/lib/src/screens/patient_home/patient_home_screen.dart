@@ -627,15 +627,23 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> with WidgetsBindi
       selectedIndex: _selectedTabIndex,
       onItemTapped: (index) {
         setState(() => _selectedTabIndex = index);
-        final routes = [
-          AppRoutes.home,
-          AppRoutes.myRequests,
-          AppRoutes.findDonors,
-          AppRoutes.messages,
-          AppRoutes.settings,
-        ];
-        if (routes[index].isNotEmpty) {
-          Navigator.pushReplacementNamed(context, routes[index]);
+        // Routes: 0=Home, 1=Request, 2=Find Donors (Map), 3=Profile
+        switch (index) {
+          case 0:
+            // Already on Home
+            break;
+          case 1:
+            // Navigate to My Requests
+            Navigator.pushReplacementNamed(context, AppRoutes.myRequests);
+            break;
+          case 2:
+            // Navigate to Nearby Donors Map (Find Donors)
+            Navigator.pushReplacementNamed(context, AppRoutes.nearbyDonorsMap);
+            break;
+          case 3:
+            // Navigate to Settings (Profile)
+            Navigator.pushReplacementNamed(context, AppRoutes.settings);
+            break;
         }
       },
     );

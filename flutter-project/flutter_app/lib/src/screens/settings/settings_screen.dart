@@ -475,51 +475,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
       selectedIndex: _selectedTabIndex,
       onItemTapped: (index) {
         setState(() => _selectedTabIndex = index);
-        final routes = [
-          AppRoutes.home,
-          AppRoutes.nearbyRequests,
-          AppRoutes.findDonors,
-          AppRoutes.messages,
-          AppRoutes.settings,
-        ];
-        if (routes[index].isNotEmpty) {
-          Navigator.pushReplacementNamed(context, routes[index]);
+        // Routes: 0=Home, 1=Request, 2=Chat, 3=Profile
+        switch (index) {
+          case 0:
+            Navigator.pushReplacementNamed(context, AppRoutes.home);
+            break;
+          case 1:
+            Navigator.pushReplacementNamed(context, AppRoutes.nearbyRequests);
+            break;
+          case 2:
+            // Navigate to Messages (Chat)
+            Navigator.pushReplacementNamed(context, AppRoutes.messages);
+            break;
+          case 3:
+            // Already on Settings (Profile) - refresh
+            Navigator.pushReplacementNamed(context, AppRoutes.settings);
+            break;
         }
       },
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index, String route) {
-    final isSelected = _selectedTabIndex == index;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTabIndex = index;
-        });
-        // Always navigate to the route when tapped
-        if (route.startsWith('/')) {
-          Navigator.pushReplacementNamed(context, route);
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

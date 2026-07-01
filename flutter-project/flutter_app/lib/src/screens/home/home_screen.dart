@@ -743,15 +743,20 @@ class _HomeScreenState extends State<HomeScreen> {
       selectedIndex: _selectedTabIndex,
       onItemTapped: (index) {
         setState(() => _selectedTabIndex = index);
-        final routes = [
-          AppRoutes.home,
-          AppRoutes.nearbyRequests,
-          AppRoutes.findDonors,
-          AppRoutes.messages,
-          AppRoutes.settings,
-        ];
-        if (routes[index].isNotEmpty) {
-          Navigator.pushReplacementNamed(context, routes[index]);
+        // Routes based on bottom nav: 0=Home, 1=Request, 2=Chat, 3=Profile
+        switch (index) {
+          case 0: // Home
+            Navigator.pushReplacementNamed(context, AppRoutes.home);
+            break;
+          case 1: // Request
+            Navigator.pushReplacementNamed(context, AppRoutes.nearbyRequests);
+            break;
+          case 2: // Chat (Messages)
+            Navigator.pushReplacementNamed(context, AppRoutes.messages);
+            break;
+          case 3: // Profile (Settings)
+            Navigator.pushReplacementNamed(context, AppRoutes.settings);
+            break;
         }
       },
     );
