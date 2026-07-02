@@ -12,14 +12,12 @@ import 'screens/blood_request/blood_request_form_screen.dart';
 // Quiz screen removed from patient flow
 // import 'screens/blood_request/patient_quiz_screen.dart';
 import 'screens/donations/my_donations_screen.dart';
-// import 'screens/home/home_screen.dart'; // Removed - using MainNavigationScreen instead
 import 'screens/messages/messages_screen.dart';
 import 'screens/notifications/notifications_screen_api.dart';
 import 'screens/notifications/notification_detail_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/onboarding/onboarding_screen_2.dart';
 import 'screens/onboarding/onboarding_screen3.dart';
-import 'screens/patient_home/patient_home_screen.dart';
 import 'screens/quiz/health_eligibility_quiz_screen.dart';
 import 'screens/donors/donor_profile_screen.dart';
 import 'screens/map/unified_map_screen.dart';
@@ -72,7 +70,6 @@ class AppRoutes {
   static const notificationDetail = '/notification-detail';
   static const profile = '/profile';
   static const editProfile = '/edit-profile';
-  static const patientHome = '/patient-home';
   static const bloodRequestForm = '/blood-request-form';
   static const healthEligibilityQuiz = '/health-eligibility-quiz';
   static const aiChatbot = '/ai-chatbot';
@@ -122,7 +119,6 @@ class AppRoutes {
     myDonations: (context) => const MyDonationsScreen(),
     profile: (context) => const ProfileScreen(),
     editProfile: (context) => const EditProfileScreen(),
-    patientHome: (context) => const PatientHomeScreen(),
     // Quiz screen removed from patient flow
     // patientQuiz: (context) => const PatientQuizScreen(),
     bloodRequestForm: (context) => const BloodRequestFormScreen(),
