@@ -743,15 +743,20 @@ class _HomeScreenState extends State<HomeScreen> {
       selectedIndex: _selectedTabIndex,
       onItemTapped: (index) {
         setState(() => _selectedTabIndex = index);
-        final routes = [
-          AppRoutes.home,
-          AppRoutes.nearbyRequests,
-          AppRoutes.findDonors,
-          AppRoutes.messages,
-          AppRoutes.settings,
-        ];
-        if (routes[index].isNotEmpty) {
-          Navigator.pushReplacementNamed(context, routes[index]);
+        // Routes based on bottom nav: 0=Home, 1=Request, 2=Chat, 3=Profile
+        switch (index) {
+          case 0: // Home
+            Navigator.pushReplacementNamed(context, AppRoutes.home);
+            break;
+          case 1: // Request
+            Navigator.pushReplacementNamed(context, AppRoutes.nearbyRequests);
+            break;
+          case 2: // Chat (Messages)
+            Navigator.pushReplacementNamed(context, AppRoutes.messages);
+            break;
+          case 3: // Profile (Settings)
+            Navigator.pushReplacementNamed(context, AppRoutes.settings);
+            break;
         }
       },
     );
@@ -998,74 +1003,53 @@ class _BloodRequestCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Units and Urgency Row
+                  // Patient Name
+                  Text(
+                    request.patientName,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+
+                  // Location Row
                   Row(
                     children: [
-                      Text(
-                        '${request.unitsNeeded} Unit${request.unitsNeeded > 1 ? 's' : ''} Needed',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
+                      const Icon(
+                        Icons.location_on_rounded,
+                        size: 12,
+                        color: AppColors.textSecondary,
                       ),
-                      const Spacer(),
-                      // Urgency Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: urgencyColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              urgencyIcon,
-                              size: 10,
-                              color: urgencyColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              request.urgencyLevel.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: urgencyColor,
-                              ),
-                            ),
-                          ],
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          request.hospitalName != null && request.hospitalName!.isNotEmpty
+                              ? request.hospitalName!
+                              : (request.location != null && request.location!.isNotEmpty
+                                  ? request.location!
+                                  : 'Location specified'),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
 
-                  // Hospital and Location
-                  Text(
-                    request.hospitalName != null && request.hospitalName!.isNotEmpty
-                        ? request.hospitalName!
-                        : (request.location != null && request.location!.isNotEmpty
-                            ? request.location!
-                            : 'Location specified'),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Time
+                  // Time and Units Row
                   Row(
                     children: [
                       const Icon(
                         Icons.access_time_rounded,
-                        size: 14,
+                        size: 12,
                         color: AppColors.textSecondary,
                       ),
                       const SizedBox(width: 4),
@@ -1074,6 +1058,48 @@ class _BloodRequestCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('•', style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5))),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${request.unitsNeeded} unit${request.unitsNeeded > 1 ? 's' : ''} needed',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Urgency Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: urgencyColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              urgencyIcon,
+                              size: 9,
+                              color: urgencyColor,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              request.urgencyLevel.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: urgencyColor,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

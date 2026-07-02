@@ -112,13 +112,35 @@ def blood_request_list(request):
         # Order by urgency (critical first) and then by date
         queryset = queryset.order_by('-urgency_level', '-created_at')
 
+        # Apply availability filtering for authenticated donors
+        if request.user and request.user.is_authenticated:
+            donor_profile = getattr(request.user, 'profile', None)
+            if donor_profile:
+                from .utils import filter_requests_by_availability
+                # Convert queryset to list and filter by availability
+                all_requests = list(queryset)
+                filtered_requests = filter_requests_by_availability(
+                    all_requests, donor_profile, timezone.now()
+                )
+                logger.info(f"Filtered blood requests by availability: {len(filtered_requests)}/{len(all_requests)}")
+                queryset = filtered_requests
+
         serializer = PublicBloodRequestSerializer(queryset, many=True)
+
+        # Get count - handle both QuerySet and list
+        # Note: hasattr() doesn't work here because list also has count() method (but requires argument)
+        # Use isinstance to check if it's a QuerySet
+        from django.db.models import QuerySet
+        if isinstance(queryset, QuerySet):
+            count = queryset.count()
+        else:
+            count = len(queryset)
 
         return success_response(
             message='Blood requests retrieved successfully.',
             data={
                 'blood_requests': serializer.data,
-                'count': queryset.count()
+                'count': count
             }
         )
 
@@ -166,6 +188,7 @@ def blood_request_create(request):
         logger.info(f"Blood request create data: {request.data}")
         logger.info(f"location_lat: {request.data.get('location_lat')}")
         logger.info(f"location_lng: {request.data.get('location_lng')}")
+        logger.info(f"🐛 NEEDED_BY from frontend: {request.data.get('needed_by')}")
 
         serializer = BloodRequestSerializer(
             data=request.data,
@@ -173,8 +196,12 @@ def blood_request_create(request):
         )
 
         if serializer.is_valid():
+            logger.info(f"🐛 Serializer validated_data: {serializer.validated_data}")
+            logger.info(f"🐛 Serializer validated_data needed_by: {serializer.validated_data.get('needed_by')}")
+
             blood_request = serializer.save()
             logger.info(f"Blood request saved - lat: {blood_request.location_lat}, lng: {blood_request.location_lng}")
+            logger.info(f"🐛 SAVED blood_request.needed_by: {blood_request.needed_by}")
 
             # Create PatientQuiz record if quiz_responses were provided
             quiz_responses = request.data.get('quiz_responses')
@@ -593,25 +620,71 @@ def nearby_blood_requests(request):
         # CRITICAL FIX: Calculate distances and filter by radius
         # Distance = DONOR_LOCATION <-> REQUEST_LOCATION (not self)
         requests_data = []
-        for req in queryset:
-            # Skip if request doesn't have location
-            if not req.location_lat or not req.location_lng:
-                continue
 
-            # CRITICAL: Calculate distance from DONOR to REQUEST location
-            distance = haversine_distance(
-                donor_lat, donor_lng,  # Donor's location
-                req.location_lat, req.location_lng  # Request (patient) location
+        # Get donor profile for availability filtering
+        donor_profile = None
+        if request.user and request.user.is_authenticated:
+            donor_profile = getattr(request.user, 'profile', None)
+
+        # Convert queryset to list for availability filtering
+        all_requests = list(queryset)
+
+        # Apply availability filtering if donor profile exists
+        if donor_profile:
+            from .utils import filter_requests_by_availability
+            filtered_by_location = []
+
+            for req in all_requests:
+                # Skip if request doesn't have location
+                if not req.location_lat or not req.location_lng:
+                    continue
+
+                # CRITICAL: Calculate distance from DONOR to REQUEST location
+                distance = haversine_distance(
+                    donor_lat, donor_lng,  # Donor's location
+                    req.location_lat, req.location_lng  # Request (patient) location
+                )
+
+                # Only include requests within radius
+                if distance <= radius:
+                    # Add distance to request object temporarily for filtering
+                    req.distance_km = round(distance, 1)
+                    filtered_by_location.append(req)
+
+            # Now filter by availability
+            availability_filtered = filter_requests_by_availability(
+                filtered_by_location, donor_profile, timezone.now()
             )
 
-            # Only include requests within radius
-            if distance <= radius:
+            for req in availability_filtered:
                 request_dict = PublicBloodRequestSerializer(req).data
-                request_dict['distance_km'] = round(distance, 1)
+                request_dict['distance_km'] = getattr(req, 'distance_km', 0)
                 requests_data.append(request_dict)
 
-        # Sort by distance (nearest first) then by urgency
-        requests_data.sort(key=lambda x: (x['distance_km'], x.get('urgency_level', 'normal')))
+            logger.info(f"Filtered to {len(requests_data)} requests by availability from {len(filtered_by_location)} within radius")
+        else:
+            # No authenticated user, skip availability filtering
+            for req in all_requests:
+                # Skip if request doesn't have location
+                if not req.location_lat or not req.location_lng:
+                    continue
+
+                # CRITICAL: Calculate distance from DONOR to REQUEST location
+                distance = haversine_distance(
+                    donor_lat, donor_lng,  # Donor's location
+                    req.location_lat, req.location_lng  # Request (patient) location
+                )
+
+                # Only include requests within radius
+                if distance <= radius:
+                    request_dict = PublicBloodRequestSerializer(req).data
+                    request_dict['distance_km'] = round(distance, 1)
+                    requests_data.append(request_dict)
+
+        # Sort by latest requests first (newest created_at), then by distance (nearest for same date)
+        # Use stable sort: sort by secondary key first, then by primary key
+        requests_data.sort(key=lambda x: x['distance_km'])  # Secondary: distance ascending
+        requests_data.sort(key=lambda x: x.get('created_at', ''), reverse=True)  # Primary: newest first
 
         return success_response(
             message=f'Found {len(requests_data)} nearby blood requests.',
@@ -756,6 +829,48 @@ def create_pledge(request, request_id):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
 
+        # Check health eligibility quiz status
+        try:
+            from health.models import EligibilityRecord
+            eligibility_record = EligibilityRecord.objects.filter(user=request.user).first()
+
+            if eligibility_record:
+                # Check if eligibility is still valid (within 30 days)
+                is_still_valid = True
+                if eligibility_record.eligibility_valid_until:
+                    if eligibility_record.eligibility_valid_until < timezone.now().date():
+                        is_still_valid = False
+
+                # If not eligible or eligibility expired, prevent pledge
+                if not eligibility_record.is_eligible:
+                    logger.info(f"❌ User not eligible based on health quiz: {eligibility_record.disqualification_reasons}")
+                    return error_response(
+                        message=f'You are not eligible to donate based on your health quiz responses. Reasons: {", ".join(eligibility_record.disqualification_reasons)}. Please consult with a healthcare provider.',
+                        status_code=status.HTTP_403_FORBIDDEN
+                    )
+
+                if not is_still_valid:
+                    logger.info(f"❌ User health eligibility expired on {eligibility_record.eligibility_valid_until}")
+                    return error_response(
+                        message='Your health eligibility has expired (valid for 30 days). Please retake the health eligibility quiz before pledging.',
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        error_code='ELIGIBILITY_EXPIRED'
+                    )
+
+                logger.info(f"✅ User health eligibility confirmed: valid until {eligibility_record.eligibility_valid_until}")
+            else:
+                # No eligibility record found - require quiz
+                logger.info(f"❌ No health eligibility record found for user")
+                return error_response(
+                    message='Please complete the health eligibility quiz before pledging to donate.',
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    error_code='QUIZ_REQUIRED'
+                )
+        except Exception as e:
+            logger.warning(f"⚠️  Could not verify health eligibility: {str(e)}")
+            # Fail open - allow pledge if eligibility check fails
+            logger.info(f"⚠️  Proceeding with pledge despite eligibility check failure")
+
         # Validate pledge data
         pledge_serializer = DonorResponseCreateSerializer(data=request.data)
         if not pledge_serializer.is_valid():
@@ -803,15 +918,68 @@ def create_pledge(request, request_id):
                 logger.info(f"🔔 Creating internal pledge notification for patient {blood_request.requested_by.email}")
                 from notifications.views import send_push_notification
 
+                # Get donor profile for location data
+                donor_profile = None
+                donor_city = None
+                donor_address = None
+                donor_location_lat = None
+                donor_location_lng = None
+
+                try:
+                    donor_profile = request.user.profile
+                    donor_city = donor_profile.city
+                    donor_address = donor_profile.address
+                    donor_location_lat = donor_profile.location_lat
+                    donor_location_lng = donor_profile.location_lng
+                except Exception as e:
+                    logger.warning(f"Could not get donor profile: {str(e)}")
+
+                # Build notification data with full donor information
+                notification_data = {
+                    'donor_name': request.user.full_name or request.user.email,
+                    'donor_phone': request.user.phone_num,  # Fixed: phone_num not phone
+                    'blood_group': blood_request.blood_group,
+                    'pledge_id': str(pledge.id),
+                    'request_id': str(blood_request.id),
+                    'units_pledged': pledge.units_pledged,
+                }
+
+                # Add location information if available
+                if donor_address:
+                    notification_data['address'] = donor_address
+                if donor_city:
+                    notification_data['city'] = donor_city
+                if donor_location_lat and donor_location_lng:
+                    notification_data['location_lat'] = str(donor_location_lat)
+                    notification_data['location_lng'] = str(donor_location_lng)
+                    # Calculate distance if patient location is available
+                    if blood_request.location_lat and blood_request.location_lng:
+                        try:
+                            from math import sin, cos, sqrt, atan2, radians
+                            lat1, lon1 = float(donor_location_lat), float(donor_location_lng)
+                            lat2, lon2 = float(blood_request.location_lat), float(blood_request.location_lng)
+
+                            # Haversine formula for distance
+                            R = 6371  # Earth's radius in km
+                            dlat = radians(lat2 - lat1)
+                            dlon = radians(lon2 - lon1)
+                            a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+                            c = 2 * atan2(sqrt(a), sqrt(1-a))
+                            distance = R * c
+
+                            if distance < 1:
+                                notification_data['distance'] = f"{int(distance * 1000)} meters away"
+                            else:
+                                notification_data['distance'] = f"{distance:.1f} km away"
+                        except Exception as e:
+                            logger.warning(f"Failed to calculate distance: {str(e)}")
+
                 notification = send_push_notification(
                     user=blood_request.requested_by,
-                    title='New Pledge Received! 🩸',
-                    message=f'{request.user.full_name or request.user.email} has pledged to donate {blood_request.blood_group} blood for {blood_request.patient_name}.',
+                    title='Donor Pledge Received',
+                    message=f'A donor has pledged to donate {blood_request.blood_group} blood for your request regarding {blood_request.patient_name}. Please review the details and contact the donor to coordinate.',
                     notif_type='new_pledge',
-                    data={
-                        'request_id': str(blood_request.id),
-                        'pledge_id': str(pledge.id),
-                    },
+                    data=notification_data,
                     send_push=True
                 )
                 logger.info(f"✅ Internal pledge notification created: ID={notification.id if notification else 'N/A'}")
@@ -1506,18 +1674,41 @@ def accept_pledge(request, request_id, pledge_id):
                 conversation_id = None
                 logger.warning("Chat app not available")
 
-            # Create notification for donor
+            # Create notification for donor with full patient details
             if pledge.donor:
                 try:
                     from notifications.models import Notification
+
+                    # Build notification data with patient information
+                    notification_data = {
+                        'patient_name': request.user.full_name or request.user.email,
+                        'patient_phone': request.user.phone_num,
+                        'blood_group': blood_request.blood_group,
+                        'pledge_id': str(pledge.id),
+                        'request_id': str(blood_request.id),
+                        'conversation_id': conversation_id,
+                        'units_needed': blood_request.units_needed,
+                    }
+
+                    # Add location/hospital information if available
+                    if blood_request.hospital_name:
+                        notification_data['hospital_name'] = blood_request.hospital_name
+                    if blood_request.location:
+                        notification_data['location'] = blood_request.location
+                    # Note: BloodRequest doesn't have a city field, city is in UserProfile
+                    if blood_request.location_lat and blood_request.location_lng:
+                        notification_data['location_lat'] = str(blood_request.location_lat)
+                        notification_data['location_lng'] = str(blood_request.location_lng)
+
                     Notification.objects.create(
                         user=pledge.donor,
-                        title='Your Pledge Has Been Confirmed!',
-                        message=f'{request.user.full_name or request.user.email} has confirmed your pledge to donate {blood_request.blood_group} blood. Chat is now open.',
+                        title='Pledge Confirmed',
+                        message=f'Your pledge to donate {blood_request.blood_group} blood has been confirmed. The patient will contact you shortly to coordinate the donation.',
                         type='pledge_confirmed',
                         related_request_id=str(blood_request.id),
                         related_pledge_id=str(pledge.id),
-                        related_conversation_id=conversation_id
+                        related_conversation_id=conversation_id,
+                        data=notification_data  # Include patient details
                     )
                     logger.info(f"Notification sent to donor {pledge.donor.email}")
                 except Exception as e:
@@ -3003,12 +3194,31 @@ def public_blood_request_page(request, share_id):
             'progress_percent': progress_percent,
             'units_remaining': blood_request.units_remaining,
             'responders_count': blood_request.responders_count,
-            'is_fulfilled': blood_request.units_pledged >= blood_request.units_needed,
+            'is_fulfilled': blood_request.units_received >= blood_request.units_needed,
             'time_remaining': None,
+            'patient_lat': float(blood_request.location_lat) if blood_request.location_lat else None,
+            'patient_lng': float(blood_request.location_lng) if blood_request.location_lng else None,
         }
 
-        # Calculate time remaining
-        if blood_request.expires_at:
+        # Calculate time remaining until needed_by
+        if blood_request.needed_by:
+            time_delta = blood_request.needed_by - timezone.now()
+            if time_delta.total_seconds() > 0:
+                days = time_delta.days
+                hours = int(time_delta.total_seconds() / 3600)
+                minutes = int(time_delta.total_seconds() / 60) % 60
+
+                if days > 0:
+                    context['time_remaining'] = f"{days} day{'s' if days != 1 else ''}"
+                elif hours > 0:
+                    context['time_remaining'] = f"{hours} hour{'s' if hours != 1 else ''}"
+                else:
+                    context['time_remaining'] = f"{minutes} minute{'s' if minutes != 1 else ''}"
+            else:
+                context['time_remaining'] = "Expired"
+
+        # Also calculate expires_at time (for backward compatibility)
+        if blood_request.expires_at and not context.get('time_remaining'):
             time_delta = blood_request.expires_at - timezone.now()
             if time_delta.total_seconds() > 0:
                 hours = int(time_delta.total_seconds() / 3600)
@@ -3024,7 +3234,7 @@ def public_blood_request_page(request, share_id):
 
 
 @csrf_exempt
-@rate_limit(max_requests=5, period=3600)  # 5 pledges per hour per IP
+# @rate_limit(max_requests=5, period=3600)  # Disabled for development - 5 pledges per hour per IP
 def create_external_pledge(request):
     """
     External pledge creation API endpoint (no authentication required).
@@ -3076,6 +3286,23 @@ def create_external_pledge(request):
         donor_phone = data.get('donor_phone', '').strip()
         donor_blood_group = data.get('donor_blood_group', '').strip()
         note = data.get('note', '').strip()
+        donor_location_lat = data.get('donor_location_lat')
+        donor_location_lng = data.get('donor_location_lng')
+        donor_address = data.get('donor_address', '').strip()
+        donor_city = data.get('donor_city', '').strip()
+
+        # Validation - address and city are now required
+        if not donor_address or len(donor_address) < 5:
+            return JsonResponse({
+                'success': False,
+                'error': 'donor_address is required (minimum 5 characters)'
+            }, status=400)
+
+        if not donor_city or len(donor_city) < 2:
+            return JsonResponse({
+                'success': False,
+                'error': 'donor_city is required (minimum 2 characters)'
+            }, status=400)
 
         # Validation
         if not blood_request_id:
@@ -3149,9 +3376,21 @@ def create_external_pledge(request):
             blood_request=blood_request,
             donor=None,  # External pledge - no user account
             units_pledged=1,
-            note=f"{note}\n\nPhone: {donor_phone}" if note else f"Phone: {donor_phone}",
+            note=f"{note}\n\nPhone: {donor_phone}\nAddress: {donor_address}, {donor_city}" if note else f"Phone: {donor_phone}\nAddress: {donor_address}, {donor_city}",
             status='pledged'
         )
+
+        # Store location data in pledge for later use
+        pledge.donor_name = donor_name
+        pledge.donor_phone = donor_phone
+        pledge.donor_blood_group = donor_blood_group
+        pledge.donor_location_lat = donor_location_lat
+        pledge.donor_location_lng = donor_location_lng
+        pledge.donor_address = donor_address
+        pledge.donor_city = donor_city
+        pledge.save(update_fields=['donor_name', 'donor_phone', 'donor_blood_group',
+                                   'donor_location_lat', 'donor_location_lng',
+                                   'donor_address', 'donor_city'])
 
         # Update blood request progress
         blood_request.units_pledged = F('units_pledged') + 1
@@ -3161,31 +3400,72 @@ def create_external_pledge(request):
         # Refresh to get updated values
         blood_request.refresh_from_db()
 
-        # Update status if fulfilled
-        if blood_request.units_pledged >= blood_request.units_needed:
-            blood_request.status = 'partial' if blood_request.units_received > 0 else 'fulfilled'
-            blood_request.save()
+        # Don't auto-fulfill based on pledges - only mark fulfilled when units_received >= units_needed
+        # Status should remain 'pending' until patient actually confirms donations are complete
+        # The is_fulfilled check should be based on units_received, not units_pledged
 
         # Send notification to patient (in-app notification)
         if blood_request.requested_by:
             try:
                 from notifications.models import Notification
+                import json
+
+                # Build notification data with donor information
+                notification_data = {
+                    'donor_name': donor_name,
+                    'donor_phone': donor_phone,
+                    'blood_group': donor_blood_group,
+                    'pledge_id': str(pledge.id),
+                    'request_id': str(blood_request.id),
+                    'units_pledged': pledge.units_pledged,
+                }
+
+                # Add location information if available
+                if donor_address:
+                    notification_data['address'] = donor_address
+                if donor_city:
+                    notification_data['city'] = donor_city
+                if donor_location_lat and donor_location_lng:
+                    notification_data['location_lat'] = str(donor_location_lat)
+                    notification_data['location_lng'] = str(donor_location_lng)
+                    # Calculate distance if patient location is available
+                    if blood_request.location_lat and blood_request.location_lng:
+                        try:
+                            from math import sin, cos, sqrt, atan2, radians
+                            lat1, lon1 = float(donor_location_lat), float(donor_location_lng)
+                            lat2, lon2 = float(blood_request.location_lat), float(blood_request.location_lng)
+
+                            # Haversine formula for distance
+                            R = 6371  # Earth's radius in km
+                            dlat = radians(lat2 - lat1)
+                            dlon = radians(lon2 - lon1)
+                            a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+                            c = 2 * atan2(sqrt(a), sqrt(1-a))
+                            distance = R * c
+
+                            if distance < 1:
+                                notification_data['distance'] = f"{int(distance * 1000)} meters away"
+                            else:
+                                notification_data['distance'] = f"{distance:.1f} km away"
+                        except Exception as e:
+                            logger.warning(f"Failed to calculate distance: {str(e)}")
 
                 # Create in-app notification
                 Notification.objects.create(
                     user=blood_request.requested_by,
-                    title='🎉 New External Pledge Received!',
-                    message=f'{donor_name} has pledged to donate {donor_blood_group} blood for {blood_request.patient_name}. Contact: {donor_phone}',
+                    title='Donor Pledge Received',
+                    message=f'A donor has pledged to donate {donor_blood_group} blood for your request regarding {blood_request.patient_name}. Please review the donor details and contact them to coordinate the donation.',
                     type='external_pledge',
                     related_request_id=blood_request.id,
+                    data=notification_data
                 )
                 logger.info(f"In-app notification created for patient {blood_request.requested_by.id}")
 
                 # Try FCM notification if configured
                 send_push_notification(
                     user_id=blood_request.requested_by.id,
-                    title='🎉 New External Pledge Received!',
-                    body=f'{donor_name} has pledged to donate {donor_blood_group} blood.',
+                    title='Donor Pledge Received',
+                    body=f'A donor has pledged to donate {donor_blood_group} blood.',
                     data={
                         'type': 'external_pledge',
                         'related_request_id': str(blood_request.id),
@@ -3218,6 +3498,53 @@ def create_external_pledge(request):
         return JsonResponse({
             'success': False,
             'error': 'Failed to create pledge. Please try again.'
+        }, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def external_pledge_status(request, pledge_id):
+    """
+    API for external donors to check their pledge status.
+
+    GET /api/external-pledge-status/{pledge_id}/
+
+    Allows external donors (without accounts) to check if their pledge
+    has been accepted by the patient.
+
+    Response:
+    {
+        "success": true,
+        "pledge": {
+            "id": "uuid",
+            "status": "confirmed",
+            "created_at": "2024-01-15T10:30:00Z",
+            "accepted_at": "2024-01-15T11:00:00Z"
+        }
+    }
+    """
+    try:
+        pledge = get_object_or_404(DonorResponse, id=pledge_id)
+
+        # Return pledge status
+        return JsonResponse({
+            'success': True,
+            'pledge': {
+                'id': str(pledge.id),
+                'status': pledge.status,
+                'created_at': pledge.created_at.isoformat(),
+                'accepted_at': pledge.accepted_at.isoformat() if pledge.accepted_at else None,
+                'confirmed_at': pledge.confirmed_at.isoformat() if pledge.confirmed_at else None,
+                'rejected_at': pledge.rejected_at.isoformat() if pledge.rejected_at else None,
+                'units_pledged': pledge.units_pledged,
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching pledge status: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': 'Failed to fetch pledge status'
         }, status=500)
 
 
@@ -3264,7 +3591,7 @@ def public_request_progress_api(request, share_id):
                 'responders_count': blood_request.responders_count,
                 'progress_percent': progress_percent,
                 'status': blood_request.status,
-                'is_fulfilled': blood_request.units_pledged >= blood_request.units_needed,
+                'is_fulfilled': blood_request.units_received >= blood_request.units_needed,
             }
         })
 

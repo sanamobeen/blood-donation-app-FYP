@@ -29,17 +29,32 @@ def get_fcm_app():
 
     if _fcm_app is None:
         try:
+            import os
+
+            # Check if Firebase is already initialized by settings.py
+            if firebase_admin._apps:
+                # Use the existing app
+                _fcm_app = list(firebase_admin._apps.values())[0]
+                logger.info("Using existing Firebase Admin SDK instance from settings")
+                return _fcm_app
+
             # Check if Firebase credentials are configured
             cred = None
+            firebase_credentials_path = os.environ.get('FIREBASE_CREDENTIALS_PATH')
+
+            # Resolve relative path if needed
+            if firebase_credentials_path and not firebase_credentials_path.startswith('/'):
+                from django.conf import settings
+                firebase_credentials_path = str(settings.BASE_DIR / firebase_credentials_path)
 
             # Check for FIREBASE_CREDENTIALS (dict) first
             if hasattr(settings, 'FIREBASE_CREDENTIALS') and settings.FIREBASE_CREDENTIALS:
                 # From dictionary
                 cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
             # Check for FIREBASE_CREDENTIALS_PATH (file path)
-            elif hasattr(settings, 'FIREBASE_CREDENTIALS_PATH') and settings.FIREBASE_CREDENTIALS_PATH:
+            elif firebase_credentials_path and os.path.exists(firebase_credentials_path):
                 # From file path
-                cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+                cred = credentials.Certificate(firebase_credentials_path)
             else:
                 # For development, try to initialize without credentials
                 # This will work for development but needs proper credentials in production
@@ -48,7 +63,8 @@ def get_fcm_app():
                 cred = None
 
             if cred:
-                _fcm_app = firebase_admin.initialize_app(cred, options={'project_id': getattr(settings, 'FIREBASE_PROJECT_ID', None)})
+                _fcm_app = firebase_admin.initialize_app(cred, options={'project_id': 'blood-donation-chat'})
+                logger.info("Firebase Admin SDK initialized successfully in fcm_service")
             else:
                 # Initialize without credentials (for development only)
                 _fcm_app = firebase_admin.initialize_app()

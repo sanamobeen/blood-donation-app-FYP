@@ -377,7 +377,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'user_full_name', 'email', 'username',
             'blood_group', 'age', 'gender', 'weight',
             'location_lat', 'location_lng', 'city', 'address',
-            'date_of_birth', 'profile_picture', 'profile_picture_url'
+            'date_of_birth', 'profile_picture', 'profile_picture_url',
+            'available_all_day', 'availability'  # Donor availability fields
         ]
         read_only_fields = ['id', 'user_full_name', 'email', 'username', 'age', 'profile_picture_url']
 
@@ -506,7 +507,8 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
             'blood_group', 'date_of_birth',
             'gender', 'weight',
             'location_lat', 'location_lng', 'city', 'address',
-            'profile_picture'
+            'profile_picture',
+            'available_all_day', 'availability'  # Donor availability fields
         ]
 
     def validate_gender(self, value):

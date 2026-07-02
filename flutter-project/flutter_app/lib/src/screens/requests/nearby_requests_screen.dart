@@ -10,6 +10,7 @@ import '../../app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../models/blood_request.dart';
+import '../../models/donor_availability.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import 'blood_request_detail_screen.dart';
 import '../../widgets/pledge_dialog.dart';
@@ -29,9 +30,15 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
   Set<String> _pledgedRequestIds = {}; // Track request IDs user has pledged to
   String? _currentUserId; // Track current user ID to prevent self-pledges
 
+  // SOS requests
+  List<Map<String, dynamic>> _sosRequests = [];
+
   // User's blood group for filtering
   String? _userBloodGroup;
   List<String> _compatibleBloodGroups = [];
+
+  // Donor's availability data
+  DonorAvailability? _donorAvailability;
 
   // Donor's profile location (from their profile, not GPS)
   double? _donorProfileLat;
@@ -100,6 +107,17 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
                 _donorProfileLng = lng;
                 _donorCity = profile['city']?.toString();
               });
+            }
+          }
+
+          // Load donor's availability data
+          if (profile['availability'] != null) {
+            try {
+              setState(() {
+                _donorAvailability = DonorAvailability.fromJson(profile['availability']);
+              });
+            } catch (e) {
+              debugPrint('Error loading availability: $e');
             }
           }
         }
@@ -309,7 +327,7 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
         bloodGroup: request.bloodGroup,
         unitsNeeded: request.unitsNeeded,
         hospitalName: request.hospitalName ?? 'Hospital',
-        requiredBy: '${request.createdAt.day}/${request.createdAt.month}/${request.createdAt.year}',
+        requiredBy: _formatNeededByTime(request.neededBy),
         onPledgeCreated: () {
           // Add to pledged set and reload requests after pledge
           setState(() {
@@ -335,16 +353,28 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
     });
 
     try {
-      // Fetch real blood requests from backend
-      final response = await ApiService.getBloodRequests(status: 'pending');
+      // Fetch regular blood requests from backend
+      final bloodRequestsResponse = await ApiService.getBloodRequests(status: 'pending');
+
+      // Fetch active SOS requests
+      final sosResponse = await ApiService.getActiveSosRequests(
+        lat: _donorProfileLat ?? 31.5204,
+        lng: _donorProfileLng ?? 74.3587,
+      );
 
       if (mounted) {
         setState(() {
-          _requestsResponse = response;
+          _requestsResponse = bloodRequestsResponse;
           _isLoading = false;
-          if (!response.success) {
-            _errorMessage = response.message;
+          if (!bloodRequestsResponse.success) {
+            _errorMessage = bloodRequestsResponse.message;
           }
+
+          // Store SOS requests separately for display
+          _sosRequests = sosResponse['success'] == true
+              ? (sosResponse['data']?['requests'] as List? ?? [])
+                  .cast<Map<String, dynamic>>()
+              : [];
         });
       }
     } catch (e) {
@@ -352,9 +382,53 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
         setState(() {
           _isLoading = false;
           _errorMessage = 'Failed to load requests';
+          _sosRequests = [];
         });
       }
     }
+  }
+
+  /// Get time slot ID from hour (0-23)
+  /// Returns the 2-hour time slot ID for the given hour
+  String _getTimeSlotFromHour(int hour) {
+    if (hour >= 0 && hour < 2) return '12am_2am';
+    if (hour >= 2 && hour < 4) return '2am_4am';
+    if (hour >= 4 && hour < 6) return '4am_6am';
+    if (hour >= 6 && hour < 8) return '6am_8am';
+    if (hour >= 8 && hour < 10) return '8am_10am';
+    if (hour >= 10 && hour < 12) return '10am_12pm';
+    if (hour >= 12 && hour < 14) return '12pm_2pm';
+    if (hour >= 14 && hour < 16) return '2pm_4pm';
+    if (hour >= 16 && hour < 18) return '4pm_6pm';
+    if (hour >= 18 && hour < 20) return '6pm_8pm';
+    if (hour >= 20 && hour < 22) return '8pm_10pm';
+    return '10pm_12am'; // 22-23
+  }
+
+  /// Check if donor is available for the given blood request
+  /// Returns true if donor is available during the request's needed time
+  bool _isDonorAvailableForRequest(BloodRequest request) {
+    // If no availability data set, show all requests
+    if (_donorAvailability == null) return true;
+
+    // If donor is available all day, show all requests
+    if (_donorAvailability!.availableAllDay) return true;
+
+    // FIX: Convert UTC to local time before checking availability
+    // The backend stores neededBy in UTC, but donor availability is in local time
+    final localNeededBy = request.neededBy.toLocal();
+
+    // Get the day of week from neededBy date (using local time)
+    final dayName = DonorAvailability.daysOfWeek[localNeededBy.weekday - 1]; // weekday is 1-7, daysOfWeek is 0-indexed
+
+    // Check if donor is available on this day
+    if (!_donorAvailability!.isAvailableOnDay(dayName)) return false;
+
+    // Get the time slot from the neededBy hour (using local time)
+    final timeSlotId = _getTimeSlotFromHour(localNeededBy.hour);
+
+    // Check if donor is available during this time slot
+    return _donorAvailability!.isAvailableAtTime(dayName, timeSlotId);
   }
 
   List<BloodRequest> get _filteredRequests {
@@ -375,10 +449,13 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
       filtered = requests;
     }
 
+    // Then filter by donor availability time slots
+    filtered = filtered.where((r) => _isDonorAvailableForRequest(r)).toList();
+
     // Then apply additional filters
     switch (_selectedFilter) {
       case 'All':
-        // Already filtered by blood group above
+        // Already filtered by blood group and availability above
         break;
       case 'Urgent':
         filtered = filtered.where((r) => r.urgencyLevel == 'urgent').toList();
@@ -399,6 +476,45 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
         .toList();
   }
 
+  // Get combined list of all requests (SOS + regular blood requests)
+  // Returns a list of maps with type indicator
+  List<Map<String, dynamic>> get _allRequests {
+    final List<Map<String, dynamic>> combined = [];
+
+    // Add SOS requests first (highest priority)
+    for (var sos in _sosRequests) {
+      // Check blood type compatibility
+      if (_compatibleBloodGroups.isEmpty ||
+          _compatibleBloodGroups.contains(sos['blood_type'])) {
+        combined.add({
+          'type': 'sos',
+          'data': sos,
+        });
+      }
+    }
+
+    // Add regular blood requests
+    for (var request in _filteredRequests) {
+      combined.add({
+        'type': 'blood_request',
+        'data': request,
+      });
+    }
+
+    // Sort by time (latest first)
+    combined.sort((a, b) {
+      final aTime = a['type'] == 'sos'
+          ? DateTime.parse(a['data']['created_at'])
+          : (a['data'] as BloodRequest).createdAt;
+      final bTime = b['type'] == 'sos'
+          ? DateTime.parse(b['data']['created_at'])
+          : (b['data'] as BloodRequest).createdAt;
+      return bTime.compareTo(aTime);
+    });
+
+    return combined;
+  }
+
   String _getTimeAgo(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
@@ -411,6 +527,39 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
       return '${difference.inDays}d';
     } else {
       return '${dateTime.day}/${dateTime.month}';
+    }
+  }
+
+  /// Format the neededBy date/time in a readable format for the card
+  String _formatNeededByTime(DateTime dateTime) {
+    // FIX: Convert UTC to local time for display
+    // The backend stores neededBy in UTC, but users expect to see local time
+    final localDateTime = dateTime.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final neededDate = DateTime(localDateTime.year, localDateTime.month, localDateTime.day);
+
+    // Format time (using local time)
+    final hour = localDateTime.hour;
+    final minute = localDateTime.minute;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final timeStr = '${displayHour}:${minute.toString().padLeft(2, '0')} $amPm';
+
+    // Format date (using local time)
+    if (neededDate == today) {
+      return 'Today, $timeStr';
+    } else if (neededDate == today.add(const Duration(days: 1))) {
+      return 'Tomorrow, $timeStr';
+    } else if (neededDate == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday, $timeStr';
+    } else if (localDateTime.difference(now).inDays.abs() < 7) {
+      // Within a week, show day name
+      final dayName = DonorAvailability.daysOfWeek[localDateTime.weekday - 1];
+      return '${DonorAvailability.getShortDayName(dayName)}, $timeStr';
+    } else {
+      // Show date
+      return '${localDateTime.day}/${localDateTime.month}, $timeStr';
     }
   }
 
@@ -772,49 +921,90 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: _filteredRequests.length,
+      itemCount: _allRequests.length,
       itemBuilder: (context, index) {
-        final request = _filteredRequests[index];
-        final priorityColor = _getPriorityColor(request.urgencyLevel);
+        final requestItem = _allRequests[index];
+        final isSOS = requestItem['type'] == 'sos';
+        final request = requestItem['data'];
 
-        // Calculate distance using donor's REGISTERED location
-        String distanceText = 'Location unknown';
-        if (_donorProfileLat != null && _donorProfileLng != null &&
-            request.locationLat != null && request.locationLng != null) {
-          final distanceKm = _calculateDistanceInKm(
-            _donorProfileLat!,
-            _donorProfileLng!,
-            request.locationLat!,
-            request.locationLng!,
+        if (isSOS) {
+          // Show SOS request card with special styling
+          final sosData = request as Map<String, dynamic>;
+          final bloodType = sosData['blood_type'] ?? 'Unknown';
+          final hospitalName = sosData['hospital_name'] ?? 'Unknown Hospital';
+          final patientName = sosData['requester_name'] ?? 'Patient';
+          final unitsNeeded = sosData['units_needed'] ?? 1;
+          final respondersCount = sosData['responders_count'] ?? 0;
+          final createdAt = DateTime.parse(sosData['created_at']);
+
+          // Calculate distance
+          String distanceText = 'Nearby';
+          if (_donorProfileLat != null && _donorProfileLng != null &&
+              sosData['hospital_lat'] != null && sosData['hospital_lng'] != null) {
+            final distanceKm = _calculateDistanceInKm(
+              _donorProfileLat!,
+              _donorProfileLng!,
+              sosData['hospital_lat'],
+              sosData['hospital_lng'],
+            );
+            distanceText = _formatDistance(distanceKm);
+          }
+
+          return _SOSRequestCard(
+            name: patientName,
+            bloodType: bloodType,
+            hospital: hospitalName,
+            distance: distanceText,
+            time: _getTimeAgo(createdAt),
+            unitsNeeded: unitsNeeded,
+            respondersCount: respondersCount,
+            sosId: sosData['id'],
           );
-          distanceText = _formatDistance(distanceKm);
-        }
+        } else {
+          // Show regular blood request card
+          final bloodRequest = request as BloodRequest;
+          final priorityColor = _getPriorityColor(bloodRequest.urgencyLevel);
 
-        return _RequestCard(
-          name: request.patientName,
-          initials: _getInitials(request.patientName),
-          bloodType: request.bloodGroup,
-          hospital: request.hospitalName ?? 'Location specified',
-          distance: distanceText,
-          time: _getTimeAgo(request.createdAt),
-          priority: request.urgencyLevel,
-          priorityColor: priorityColor,
-          requestId: request.id,
-          unitsNeeded: request.unitsNeeded,
-          hasPledged: _pledgedRequestIds.contains(request.id),
-          isOwnRequest: _currentUserId != null && request.requestedById == _currentUserId,
+          // Calculate distance using donor's REGISTERED location
+          String distanceText = 'Location unknown';
+          if (_donorProfileLat != null && _donorProfileLng != null &&
+              bloodRequest.locationLat != null && bloodRequest.locationLng != null) {
+            final distanceKm = _calculateDistanceInKm(
+              _donorProfileLat!,
+              _donorProfileLng!,
+              bloodRequest.locationLat!,
+              bloodRequest.locationLng!,
+            );
+            distanceText = _formatDistance(distanceKm);
+          }
+
+          return _RequestCard(
+            name: bloodRequest.patientName,
+            initials: _getInitials(bloodRequest.patientName),
+            bloodType: bloodRequest.bloodGroup,
+            hospital: bloodRequest.hospitalName ?? 'Location specified',
+            distance: distanceText,
+            time: _getTimeAgo(bloodRequest.createdAt),
+            neededBy: _formatNeededByTime(bloodRequest.neededBy),
+            priority: bloodRequest.urgencyLevel,
+            priorityColor: priorityColor,
+            requestId: bloodRequest.id,
+            unitsNeeded: bloodRequest.unitsNeeded,
+            hasPledged: _pledgedRequestIds.contains(bloodRequest.id),
+            isOwnRequest: _currentUserId != null && bloodRequest.requestedById == _currentUserId,
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => BloodRequestDetailScreen(
-                  requestId: request.id,
+                  requestId: bloodRequest.id,
                 ),
               ),
             );
           },
-          onPledge: () => _handlePledge(request),
+          onPledge: () => _handlePledge(bloodRequest),
         );
+        }
       },
     );
   }
@@ -1174,7 +1364,7 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
     return UnifiedBottomNavigationBar(
       selectedIndex: 1, // Requests is index 1
       onItemTapped: (index) {
-        // Handle navigation based on index
+        // Handle navigation based on index: 0=Home, 1=Request, 2=Chat, 3=Profile
         switch (index) {
           case 0:
             Navigator.pushReplacementNamed(context, AppRoutes.home);
@@ -1184,15 +1374,11 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
             Navigator.pushReplacementNamed(context, AppRoutes.nearbyRequests);
             break;
           case 2:
-            // Navigate to Map (Find Donors)
-            Navigator.pushReplacementNamed(context, AppRoutes.findDonors);
-            break;
-          case 3:
             // Navigate to Messages (Chat)
             Navigator.pushReplacementNamed(context, AppRoutes.messages);
             break;
-          case 4:
-            // Navigate to Settings (Profile)
+          case 3:
+            // Navigate to Profile (Settings)
             Navigator.pushReplacementNamed(context, AppRoutes.settings);
             break;
         }
@@ -1200,54 +1386,6 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = index == 1; // Always show Requests as selected
-    return GestureDetector(
-      onTap: () {
-        // Handle navigation based on index
-        switch (index) {
-          case 0:
-            Navigator.pushReplacementNamed(context, AppRoutes.home);
-            break;
-          case 1:
-            // Already on Requests - refresh
-            Navigator.pushReplacementNamed(context, AppRoutes.nearbyRequests);
-            break;
-          case 2:
-            // Navigate to Map
-            Navigator.pushNamed(context, AppRoutes.nearbyDonorsMap);
-            break;
-          case 3:
-            // Navigate to Messages
-            Navigator.pushReplacementNamed(context, AppRoutes.messages);
-            break;
-          case 4:
-            // Navigate to Settings (Profile)
-            Navigator.pushReplacementNamed(context, AppRoutes.settings);
-            break;
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _FilterButton extends StatelessWidget {
@@ -1295,6 +1433,7 @@ class _RequestCard extends StatelessWidget {
   final String hospital;
   final String distance;
   final String time;
+  final String? neededBy; // New: Patient's needed date/time
   final String priority;
   final Color priorityColor;
   final VoidCallback onTap;
@@ -1311,6 +1450,7 @@ class _RequestCard extends StatelessWidget {
     required this.hospital,
     required this.distance,
     required this.time,
+    this.neededBy,
     required this.priority,
     required this.priorityColor,
     required this.onTap,
@@ -1422,14 +1562,31 @@ class _RequestCard extends StatelessWidget {
                         children: [
                           const Icon(Icons.location_on, size: 12, color: AppColors.textSecondary),
                           const SizedBox(width: 4),
-                          Text(
-                            distance,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+                          Expanded(
+                            child: Text(
+                              hospital,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
+                          // Show needed by time if available, otherwise show time ago
+                          if (neededBy != null) ...[
+                            const Icon(Icons.schedule, size: 12, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              neededBy!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           const Icon(Icons.access_time, size: 12, color: AppColors.textSecondary),
                           const SizedBox(width: 4),
                           Text(
@@ -1439,7 +1596,22 @@ class _RequestCard extends StatelessWidget {
                               color: AppColors.textSecondary,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            '$unitsNeeded unit${unitsNeeded > 1 ? "s" : ""} needed',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('•'),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -1449,13 +1621,24 @@ class _RequestCard extends StatelessWidget {
                               color: priorityColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(
-                              priority,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: priorityColor,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  priority == 'critical' ? Icons.crisis_alert : Icons.priority_high,
+                                  size: 10,
+                                  color: priorityColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  priority,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: priorityColor,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -1486,7 +1669,7 @@ class _RequestCard extends StatelessWidget {
                     ? 'Your Request'
                     : hasPledged
                         ? 'You Have Pledged'
-                        : 'I Can Help - Pledge 1 Unit',
+                        : 'I Can Help - Donate Now',
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: (hasPledged || isOwnRequest)
@@ -1494,6 +1677,230 @@ class _RequestCard extends StatelessWidget {
                     : AppColors.primary,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: AppColors.textSecondary,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SOSRequestCard extends StatelessWidget {
+  final String name;
+  final String bloodType;
+  final String hospital;
+  final String distance;
+  final String time;
+  final int unitsNeeded;
+  final int respondersCount;
+  final String sosId;
+
+  const _SOSRequestCard({
+    required this.name,
+    required this.bloodType,
+    required this.hospital,
+    required this.distance,
+    required this.time,
+    required this.unitsNeeded,
+    required this.respondersCount,
+    required this.sosId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEBEE),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD62828), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD62828).withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // SOS Badge Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD62828),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.emergency,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'SOS EMERGENCY',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Tap to respond now',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Main content
+          Row(
+            children: [
+              // Blood Type Icon
+              Container(
+                width: 50,
+                height: 50,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFD62828),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    bloodType,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Info Section
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.local_hospital,
+                          size: 12,
+                          color: Color(0xFFD62828),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            hospital,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 12, color: AppColors.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          distance,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Icon(Icons.access_time, size: 12, color: AppColors.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          time,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD62828),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '$unitsNeeded unit${unitsNeeded > 1 ? "s" : ""}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Respond Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // TODO: Navigate to SOS response screen
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('SOS response feature coming soon!'),
+                    backgroundColor: Color(0xFFD62828),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.emergency_share, size: 16),
+              label: Text(
+                'Respond to SOS - Help Now!',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD62828),
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),

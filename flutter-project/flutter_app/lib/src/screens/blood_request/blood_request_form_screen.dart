@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../models/selected_location.dart';
+import '../../app_routes.dart';
 import '../location/location_picker_screen.dart';
 
 class BloodRequestFormScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
   // Selected values
   String _selectedBloodType = 'A+';
   String _selectedUrgency = 'normal';
+  DateTime? _selectedNeededByDate;
 
   // Location data
   SelectedLocation? _selectedLocation;
@@ -154,6 +156,12 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
                   _buildSectionTitle('Urgency Level*'),
                   const SizedBox(height: 12),
                   _buildUrgencySelector(),
+                  const SizedBox(height: 20),
+
+                  // Needed By Date
+                  _buildSectionTitle('Needed By*'),
+                  const SizedBox(height: 12),
+                  _buildNeededByDatePicker(),
                   const SizedBox(height: 20),
 
                   // Contact Number
@@ -390,6 +398,180 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
     );
   }
 
+  Widget _buildNeededByDatePicker() {
+    return InkWell(
+      onTap: _pickNeededByDate,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border, width: 1),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.calendar_today,
+              size: 20,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _selectedNeededByDate == null
+                    ? 'Select date when blood is needed by*'
+                    : '${_formatDate(_selectedNeededByDate!)} ${_formatTime(_selectedNeededByDate!)}',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: _selectedNeededByDate == null
+                      ? AppColors.textSecondary.withValues(alpha: 0.8)
+                      : AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (_selectedNeededByDate != null)
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () {
+                  setState(() => _selectedNeededByDate = null);
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  String _formatTime(DateTime date) {
+    final hour = date.hour;
+    final minute = date.minute.toString().padLeft(2, '0');
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    return '$displayHour:$minute $amPm';
+  }
+
+  Future<void> _pickNeededByDate() async {
+    // Get fresh current time
+    final now = DateTime.now();
+    // Reset to start of today for date comparison
+    final today = DateTime(now.year, now.month, now.day);
+    final firstDate = today; // Start from today (no past dates)
+    final lastDate = today.add(const Duration(days: 30)); // Max 30 days from today
+
+    // Calculate initial date - if already selected, use that, otherwise 6 hours from now
+    DateTime initialDate = _selectedNeededByDate ?? now.add(const Duration(hours: 6));
+
+    // Ensure initial date is within valid range
+    if (initialDate.isBefore(firstDate.add(const Duration(hours: 1)))) {
+      initialDate = now.add(const Duration(hours: 6));
+    }
+    if (initialDate.isAfter(lastDate)) {
+      initialDate = firstDate.add(const Duration(days: 1));
+    }
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null && mounted) {
+      // Get fresh time after date picking (user might have taken time)
+      final freshNow = DateTime.now();
+      final freshToday = DateTime(freshNow.year, freshNow.month, freshNow.day);
+
+      // Determine if user picked today
+      final isToday = pickedDate.year == freshNow.year &&
+                      pickedDate.month == freshNow.month &&
+                      pickedDate.day == freshNow.day;
+
+      // Calculate initial time for time picker
+      TimeOfDay initialTime;
+
+      if (_selectedNeededByDate != null &&
+          _selectedNeededByDate!.year == pickedDate.year &&
+          _selectedNeededByDate!.month == pickedDate.month &&
+          _selectedNeededByDate!.day == pickedDate.day) {
+        // Use existing time if editing the same date
+        initialTime = TimeOfDay.fromDateTime(_selectedNeededByDate!);
+      } else if (isToday) {
+        // If picking today, start from 1 hour from now to prevent past times
+        final oneHourFromNow = freshNow.add(const Duration(hours: 1));
+        initialTime = TimeOfDay(hour: oneHourFromNow.hour, minute: oneHourFromNow.minute);
+      } else {
+        // For future dates, default to a reasonable time (e.g., 10:00 AM)
+        initialTime = const TimeOfDay(hour: 10, minute: 0);
+      }
+
+      // Now pick time
+      final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: initialTime,
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: AppColors.primary,
+                onPrimary: Colors.white,
+                surface: Colors.white,
+                onSurface: AppColors.textPrimary,
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (pickedTime != null && mounted) {
+        // Get FRESH time again after time picking (user might have taken more time)
+        final validationNow = DateTime.now();
+
+        // Create the combined DateTime
+        final selectedDateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+
+        // Validate: ensure date/time is at least 1 hour from now
+        final oneHourFromNow = validationNow.add(const Duration(hours: 1));
+        if (selectedDateTime.isBefore(oneHourFromNow)) {
+          // For urgent needs (within 1 hour), show SOS dialog
+          _showSosDialog();
+          return;
+        }
+
+        setState(() {
+          _selectedNeededByDate = selectedDateTime;
+        });
+      }
+    }
+  }
+
   Widget _buildNotesField() {
     return TextField(
       controller: _notesController,
@@ -574,8 +756,21 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
       _showError('Please enter contact number');
       return;
     }
+    if (_selectedNeededByDate == null) {
+      _showError('Please select when blood is needed by');
+      return;
+    }
     if (_selectedLocation == null) {
       _showError('Please select location');
+      return;
+    }
+
+    // Validate that the selected date/time is not in the past
+    final now = DateTime.now();
+    final oneHourFromNow = now.add(const Duration(hours: 1));
+
+    if (_selectedNeededByDate!.isBefore(oneHourFromNow)) {
+      _showSosDialog();
       return;
     }
 
@@ -612,6 +807,7 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
         location: _selectedLocation!.fullAddress,
         locationLat: double.parse(_selectedLocation!.latitude.toStringAsFixed(6)),
         locationLng: double.parse(_selectedLocation!.longitude.toStringAsFixed(6)),
+        neededBy: _selectedNeededByDate!,
         additionalNotes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
@@ -747,6 +943,56 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
         ),
+      ),
+    );
+  }
+
+  /// Show dialog with SOS button for urgent requests
+  void _showSosDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Row(
+          children: [
+            Icon(
+              Icons.emergency,
+              color: Color(0xFFD62828),
+              size: 28,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Urgent Blood Request',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'For urgent blood requests (within 1 hour), please use the SOS Emergency feature for immediate help.',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushReplacementNamed(context, AppRoutes.sos);
+            },
+            icon: const Icon(Icons.emergency_share, size: 18),
+            label: const Text('Go to SOS'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD62828),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }

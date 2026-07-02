@@ -55,6 +55,7 @@ urlpatterns = [
 public_urlpatterns = [
     path('request/<str:share_id>/', views.public_blood_request_page, name='public_request_page'),
     path('api/external-pledge/', views.create_external_pledge, name='external_pledge_api'),
+    path('api/external-pledge-status/<uuid:pledge_id>/', views.external_pledge_status, name='external_pledge_status_api'),
     path('api/request-progress/<str:share_id>/', views.public_request_progress_api, name='request_progress_api'),
 ]
 

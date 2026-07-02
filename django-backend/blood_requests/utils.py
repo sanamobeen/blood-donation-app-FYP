@@ -5,8 +5,14 @@ This module provides helper functions for:
 - Blood compatibility checking
 - GPS distance calculation using Haversine formula
 - Optimized nearby request queries
+- Donor availability time slot matching
 """
 from math import radians, cos, sin, sqrt, asin
+from datetime import datetime
+from django.utils import timezone
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # Complete blood compatibility matrix (donor -> can donate to)
@@ -328,3 +334,312 @@ def activate_backup_donor_locked(blood_request, cancelled_pledge):
         )
 
     return None
+
+
+# ============================================================================
+# Donor Availability Time Slot Matching
+# ============================================================================
+
+# Day name mapping for datetime weekday() to availability JSON keys
+WEEKDAY_MAP = {
+    0: 'monday',
+    1: 'tuesday',
+    2: 'wednesday',
+    3: 'thursday',
+    4: 'friday',
+    5: 'saturday',
+    6: 'sunday',
+}
+
+# Time slot parsing - convert "8am_10am" to (8, 10)
+TIME_SLOT_PATTERNS = {
+    'am': 'am',
+    'pm': 'pm',
+    '12am': 0, '12pm': 12,
+}
+
+
+def parse_time_slot(slot_str: str) -> tuple:
+    """
+    Parse a time slot string like '8am_10am' or '4pm_6pm' into start and end hours.
+
+    Args:
+        slot_str: Time slot string in format 'Xam_Yam' or 'Xpm_Ypm'
+
+    Returns:
+        tuple: (start_hour, end_hour) in 24-hour format
+
+    Examples:
+        >>> parse_time_slot('8am_10am')
+        (8, 10)
+        >>> parse_time_slot('4pm_6pm')
+        (16, 18)
+        >>> parse_time_slot('12pm_2pm')
+        (12, 14)
+    """
+    if not slot_str or '_' not in slot_str:
+        return None
+
+    try:
+        parts = slot_str.split('_')
+        if len(parts) != 2:
+            return None
+
+        start_str, end_str = parts
+
+        # Parse start time
+        start_hour = parse_time_string(start_str)
+        # Parse end time
+        end_hour = parse_time_string(end_str)
+
+        if start_hour is None or end_hour is None:
+            return None
+
+        return (start_hour, end_hour)
+
+    except Exception as e:
+        logger.warning(f"Failed to parse time slot '{slot_str}': {e}")
+        return None
+
+
+def parse_time_string(time_str: str) -> int:
+    """
+    Parse a time string like '8am', '12pm', '4pm' into hour in 24-hour format.
+
+    Args:
+        time_str: Time string like '8am', '12pm', '4pm'
+
+    Returns:
+        int: Hour in 24-hour format (0-23)
+
+    Examples:
+        >>> parse_time_string('8am')
+        8
+        >>> parse_time_string('8pm')
+        20
+        >>> parse_time_string('12am')
+        0
+        >>> parse_time_string('12pm')
+        12
+    """
+    time_str = time_str.lower().strip()
+
+    # Handle 12am and 12pm first (special cases)
+    if time_str == '12am':
+        return 0
+    if time_str == '12pm':
+        return 12
+
+    # Parse hour and meridiem
+    if 'am' in time_str:
+        hour_str = time_str.replace('am', '').strip()
+        hour = int(hour_str)
+        return hour  # 1am-11am stay as 1-11
+    elif 'pm' in time_str:
+        hour_str = time_str.replace('pm', '').strip()
+        hour = int(hour_str)
+        if hour == 12:
+            return 12  # 12pm stays as 12
+        return hour + 12  # 1pm-11pm become 13-23
+
+    return None
+
+
+def is_time_in_slot(dt: datetime, slot: tuple) -> bool:
+    """
+    Check if a datetime falls within a time slot.
+
+    Args:
+        dt: DateTime to check
+        slot: Tuple of (start_hour, end_hour) in 24-hour format
+
+    Returns:
+        bool: True if datetime is within the time slot
+
+    Examples:
+        >>> dt = datetime(2024, 1, 15, 9, 0)  # 9 AM on Monday
+        >>> is_time_in_slot(dt, (8, 10))  # 8 AM - 10 AM slot
+        True
+        >>> is_time_in_slot(dt, (16, 18))  # 4 PM - 6 PM slot
+        False
+    """
+    if not slot or len(slot) != 2:
+        return False
+
+    start_hour, end_hour = slot
+    current_hour = dt.hour
+
+    # Check if current hour is within the slot
+    # We use >= start and < end to handle hour-based slots
+    # For example, 5pm_6pm means hour 17 (5 PM) up to but not including hour 18 (6 PM)
+    return start_hour <= current_hour < end_hour
+
+
+def is_donor_available_at_time(needed_datetime: datetime, availability: dict = None,
+                                available_all_day: bool = False) -> bool:
+    """
+    Check if a donor is available at a specific datetime based on their availability schedule.
+
+    Args:
+        needed_datetime: The datetime when blood is needed
+        availability: Donor's availability dict like {'monday': ['8am_10am', '4pm_6pm'], ...}
+        available_all_day: If True, donor is available all day every day
+
+    Returns:
+        bool: True if donor is available at the given datetime
+
+    Examples:
+        >>> dt = datetime(2024, 1, 15, 9, 0)  # Monday 9 AM
+        >>> availability = {'monday': ['8am_10am', '4pm_6pm']}
+        >>> is_donor_available_at_time(dt, availability)
+        True
+        >>> dt2 = datetime(2024, 1, 15, 14, 0)  # Monday 2 PM
+        >>> is_donor_available_at_time(dt2, availability)
+        False
+        >>> is_donor_available_at_time(dt2, available_all_day=True)
+        True
+    """
+    # If available all day, always return True
+    if available_all_day:
+        return True
+
+    # If no availability set, assume available (backward compatibility)
+    if not availability:
+        return True
+
+    # Convert to local timezone for day checking
+    # Use UTC but get the weekday
+    try:
+        # Get the day of week (0 = Monday, 6 = Sunday)
+        weekday = needed_datetime.weekday()
+        day_key = WEEKDAY_MAP.get(weekday)
+
+        if not day_key:
+            logger.warning(f"Invalid weekday: {weekday}")
+            return True
+
+        # Get available slots for this day
+        day_slots = availability.get(day_key, [])
+
+        # If no slots defined for this day, donor is not available
+        if not day_slots:
+            return False
+
+        # Check each time slot
+        for slot_str in day_slots:
+            slot = parse_time_slot(slot_str)
+            if slot and is_time_in_slot(needed_datetime, slot):
+                return True
+
+        # No matching slot found
+        return False
+
+    except Exception as e:
+        logger.error(f"Error checking donor availability: {e}")
+        # Fail open - if we can't check, assume available
+        return True
+
+
+def filter_requests_by_availability(requests, donor_profile, current_time=None) -> list:
+    """
+    Filter blood requests based on donor's availability schedule.
+
+    This function filters a list of blood requests to only include those whose
+    needed_by time falls within the donor's availability slots.
+
+    Args:
+        requests: QuerySet or list of BloodRequest objects
+        donor_profile: UserProfile object of the donor
+        current_time: Current datetime (optional, uses timezone.now() if not provided)
+
+    Returns:
+        list: Filtered list of BloodRequest objects
+
+    Examples:
+        >>> requests = BloodRequest.objects.filter(status='pending')
+        >>> donor = request.user.profile
+        >>> filtered = filter_requests_by_availability(requests, donor)
+    """
+    if not current_time:
+        current_time = timezone.now()
+
+    # Get donor availability settings
+    available_all_day = donor_profile.available_all_day if donor_profile else False
+    availability = donor_profile.availability if donor_profile else None
+
+    filtered_requests = []
+    skipped_count = 0
+
+    for req in requests:
+        # Check if request has needed_by datetime
+        if not req.needed_by:
+            # If no needed_by time, include it (backward compatibility)
+            filtered_requests.append(req)
+            continue
+
+        # Check if donor is available at the needed time
+        if is_donor_available_at_time(req.needed_by, availability, available_all_day):
+            filtered_requests.append(req)
+        else:
+            skipped_count += 1
+            logger.debug(f"Filtered out request {req.id} - needed time {req.needed_by} not in donor availability")
+
+    if skipped_count > 0:
+        logger.info(f"Filtered {skipped_count} requests outside donor availability")
+
+    return filtered_requests
+
+
+def get_donor_availability_summary(donor_profile) -> dict:
+    """
+    Get a summary of donor's availability for display.
+
+    Args:
+        donor_profile: UserProfile object
+
+    Returns:
+        dict: Summary with available_days, time_slots, and available_all_day
+
+    Examples:
+        >>> summary = get_donor_availability_summary(user.profile)
+        >>> print(summary['available_days'])  # ['Monday', 'Tuesday', ...]
+        >>> print(summary['time_slots'])  # {'Monday': ['8am-10am'], ...}
+    """
+    if not donor_profile:
+        return {}
+
+    availability = donor_profile.availability or {}
+
+    # Count available days
+    available_days = []
+    time_slots = {}
+
+    day_names = {
+        'monday': 'Monday',
+        'tuesday': 'Tuesday',
+        'wednesday': 'Wednesday',
+        'thursday': 'Thursday',
+        'friday': 'Friday',
+        'saturday': 'Saturday',
+        'sunday': 'Sunday',
+    }
+
+    for day_key, slots in availability.items():
+        if slots:
+            day_name = day_names.get(day_key.capitalize(), day_key.capitalize())
+            available_days.append(day_name)
+            # Format slots for display
+            formatted_slots = []
+            for slot in slots:
+                parsed = parse_time_slot(slot)
+                if parsed:
+                    start, end = parsed
+                    # Convert to readable format
+                    formatted_slots.append(f"{start}:00-{end}:00")
+            time_slots[day_name] = formatted_slots
+
+    return {
+        'available_all_day': donor_profile.available_all_day,
+        'available_days': available_days,
+        'time_slots': time_slots,
+    }

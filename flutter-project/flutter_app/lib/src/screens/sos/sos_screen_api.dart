@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
+import '../../models/selected_location.dart';
+import '../location/location_picker_screen.dart';
 
-class SOSScreen extends StatefulWidget {
-  const SOSScreen({super.key});
+class SOSScreenApi extends StatefulWidget {
+  const SOSScreenApi({super.key});
 
   @override
-  State<SOSScreen> createState() => _SOSScreenState();
+  State<SOSScreenApi> createState() => _SOSScreenApiState();
 }
 
-class _SOSSScreenState extends State<SOSScreen> {
+class _SOSScreenApiState extends State<SOSScreenApi> {
   // Blood groups
   final List<String> _bloodGroups = [
     'A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-',
@@ -18,42 +20,91 @@ class _SOSSScreenState extends State<SOSScreen> {
 
   // Distance options
   final List<double> _distanceOptions = [5, 15, 25, 50];
-  double _selectedDistance = 15;
+  double _selectedDistance = 5;
 
   // Selected values
-  String _selectedBloodGroup = 'O+';
-  int _unitsNeeded = 2;
+  String? _selectedBloodGroup;
+  int _unitsNeeded = 1;
   String _situationDescription = '';
 
   // Form controllers
-  final TextEditingController _hospitalNameController = TextEditingController();
   final TextEditingController _hospitalAddressController = TextEditingController();
   final TextEditingController _contactPhoneController = TextEditingController();
   final TextEditingController _patientNameController = TextEditingController();
   final TextEditingController _ageController = TextEditingController(text: '35');
-  String _selectedGender = 'Female';
+  late TextEditingController _situationController;
+  String _selectedGender = 'female';
+
+  // Location data
+  SelectedLocation? _selectedLocation;
 
   // SOS activation
   bool _isHolding = false;
   bool _isActivated = false;
   bool _isSubmitting = false;
 
-  // Location
+  // Location for GPS purposes
   Position? _currentPosition;
+
+  bool _isLoadingProfile = true;
 
   @override
   void initState() {
     super.initState();
+    _situationController = TextEditingController(text: _situationDescription);
+    _loadUserProfile();
     _getCurrentLocation();
+  }
+
+  /// Load user profile to get existing location data
+  Future<void> _loadUserProfile() async {
+    try {
+      final profileResponse = await ApiService.getProfile();
+      if (profileResponse['success'] == true) {
+        final profileData = profileResponse['data'];
+        final profile = profileData['profile'];
+
+        // Check if user has existing location data from donor profile
+        if (profile != null &&
+            profile['location_lat'] != null &&
+            profile['location_lng'] != null) {
+          final lat = double.tryParse(profile['location_lat'].toString());
+          final lng = double.tryParse(profile['location_lng'].toString());
+
+          if (lat != null && lng != null) {
+            // Use existing location as default
+            setState(() {
+              _selectedLocation = SelectedLocation(
+                locationName: profile['city'] ?? 'Your Location',
+                fullAddress: profile['address'] ?? 'Location from profile',
+                latitude: lat,
+                longitude: lng,
+              );
+              _isLoadingProfile = false;
+            });
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore error, user will need to select location manually
+      debugPrint('Error loading profile: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingProfile = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
-    _hospitalNameController.dispose();
     _hospitalAddressController.dispose();
     _contactPhoneController.dispose();
     _patientNameController.dispose();
     _ageController.dispose();
+    _situationController.dispose();
     super.dispose();
   }
 
@@ -418,20 +469,8 @@ class _SOSSScreenState extends State<SOSScreen> {
   Widget _buildHospitalInfoFields() {
     return Column(
       children: [
-        // Hospital Name
-        _buildTextField(
-          controller: _hospitalNameController,
-          hintText: 'Hospital name',
-          prefixIcon: Icons.local_hospital,
-        ),
-        const SizedBox(height: 12),
-
-        // Hospital Address
-        _buildTextField(
-          controller: _hospitalAddressController,
-          hintText: 'Hospital address',
-          prefixIcon: Icons.location_on,
-        ),
+        // Hospital Location with Autocomplete
+        _buildLocationSearchField(),
         const SizedBox(height: 12),
 
         // Contact Phone
@@ -443,6 +482,127 @@ class _SOSSScreenState extends State<SOSScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildLocationSearchField() {
+    if (_selectedLocation != null) {
+      // Show selected location with option to change (same style as blood request form)
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFEBEE),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFD62828).withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_pin,
+                  size: 20,
+                  color: Color(0xFFD62828),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _selectedLocation!.locationName,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF424242),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () {
+                    setState(() => _selectedLocation = null);
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 28),
+              child: Text(
+                _selectedLocation!.fullAddress,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF757575),
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Show "Add Location" button (same style as blood request form)
+    return InkWell(
+      onTap: _openLocationPicker,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFEBEE),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFD62828).withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.add_location_alt,
+              size: 24,
+              color: Color(0xFFD62828),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Add Location',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey.shade400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLocationPicker() async {
+    final result = await Navigator.push<SelectedLocation>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const LocationPickerScreen(),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _selectedLocation = result;
+      });
+    }
   }
 
   Widget _buildTextField({
@@ -516,10 +676,10 @@ class _SOSSScreenState extends State<SOSScreen> {
           color: Color(0xFFD62828),
         ),
         underline: const SizedBox.shrink(),
-        items: ['Male', 'Female', 'Other'].map((String gender) {
+        items: ['male', 'female', 'other'].map((String gender) {
           return DropdownMenuItem<String>(
             value: gender,
-            child: Text(gender),
+            child: Text(gender[0].toUpperCase() + gender.substring(1)), // Display with capital first letter
           );
         }).toList(),
         onChanged: (String? newValue) {
@@ -576,50 +736,67 @@ class _SOSSScreenState extends State<SOSScreen> {
               ],
             ),
           ),
-          DropdownButton<String>(
-            value: _selectedBloodGroup,
-            icon: const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFFD62828),
-            ),
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFD62828),
-            ),
-            underline: const SizedBox.shrink(),
-            items: _bloodGroups.map((String group) {
-              return DropdownMenuItem<String>(
-                value: group,
-                child: Row(
-                  children: [
-                    Text(
-                      group,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFD62828),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      group.contains('+') ? '(Positive)' : '(Negative)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+          if (_selectedBloodGroup == null)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedBloodGroup = _bloodGroups.first;
+                });
+              },
+              child: Text(
+                'Select blood group',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade400,
+                  fontWeight: FontWeight.w500,
                 ),
-              );
-            }).toList(),
-            onChanged: (String? newValue) {
-              setState(() {
-                _selectedBloodGroup = newValue!;
-              });
-            },
-          ),
+              ),
+            )
+          else
+            DropdownButton<String>(
+              value: _selectedBloodGroup,
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFFD62828),
+              ),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFD62828),
+              ),
+              underline: const SizedBox.shrink(),
+              items: _bloodGroups.map((String group) {
+                return DropdownMenuItem<String>(
+                  value: group,
+                  child: Row(
+                    children: [
+                      Text(
+                        group,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFD62828),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        group.contains('+') ? '(Positive)' : '(Negative)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedBloodGroup = newValue!;
+                });
+              },
+            ),
         ],
       ),
     );
@@ -829,7 +1006,7 @@ class _SOSSScreenState extends State<SOSScreen> {
           child: TextField(
             maxLines: 4,
             maxLength: maxLength,
-            controller: TextEditingController(text: _situationDescription),
+            controller: _situationController,
             onChanged: (value) {
               setState(() {
                 _situationDescription = value;
@@ -845,11 +1022,6 @@ class _SOSSScreenState extends State<SOSScreen> {
               contentPadding: EdgeInsets.zero,
               isDense: true,
               counterText: '',
-              hintText: 'Describe the emergency situation...',
-              hintStyle: TextStyle(
-                color: Color(0xFF9E9E9E),
-                fontSize: 14,
-              ),
             ),
           ),
         ),
@@ -919,12 +1091,22 @@ class _SOSSScreenState extends State<SOSScreen> {
   void _activateSOS() async {
     if (_isActivated || _isSubmitting) return;
 
+    // Validate blood group is selected
+    if (_selectedBloodGroup == null) {
+      _showErrorDialog('Please select a blood group first');
+      return;
+    }
+
     // Validate required fields
-    if (_hospitalNameController.text.isEmpty ||
-        _hospitalAddressController.text.isEmpty ||
-        _contactPhoneController.text.isEmpty ||
+    if (_contactPhoneController.text.isEmpty ||
         _patientNameController.text.isEmpty) {
       _showErrorDialog('Please fill in all required fields');
+      return;
+    }
+
+    // Validate location is selected
+    if (_selectedLocation == null) {
+      _showErrorDialog('Please select a location');
       return;
     }
 
@@ -933,20 +1115,19 @@ class _SOSSScreenState extends State<SOSScreen> {
     });
 
     try {
-      // Get blood type ID (in real app, you'd fetch this from API)
-      final bloodTypeId = _getBloodTypeId(_selectedBloodGroup);
-
+      // Send blood group string directly (backend expects "O+", "A+", etc., not integer IDs)
+      // Use location name as hospital name since hospital name field is removed
       final result = await ApiService.createSosRequest(
-        bloodType: bloodTypeId.toString(),
-        hospitalName: _hospitalNameController.text,
-        hospitalAddress: _hospitalAddressController.text,
+        bloodType: _selectedBloodGroup!,
+        hospitalName: _selectedLocation!.locationName,
+        hospitalAddress: _selectedLocation!.fullAddress,
         contactPhone: _contactPhoneController.text,
         patientName: _patientNameController.text,
         age: int.tryParse(_ageController.text) ?? 35,
         gender: _selectedGender,
         unitsNeeded: _unitsNeeded,
-        hospitalLat: _currentPosition?.latitude,
-        hospitalLng: _currentPosition?.longitude,
+        hospitalLat: _selectedLocation!.latitude,
+        hospitalLng: _selectedLocation!.longitude,
       );
 
       setState(() {
@@ -969,14 +1150,6 @@ class _SOSSScreenState extends State<SOSScreen> {
     }
   }
 
-  int _getBloodTypeId(String bloodGroup) {
-    // Simple mapping - in real app, fetch from API
-    final mapping = {
-      'A+': 1, 'A-': 2, 'B+': 3, 'B-': 4,
-      'O+': 5, 'O-': 6, 'AB+': 7, 'AB-': 8,
-    };
-    return mapping[bloodGroup] ?? 1;
-  }
 
   void _showSOSActivatedDialog() {
     showDialog(

@@ -94,11 +94,118 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     // If still no role after fetching, user can still use the app
     // Role selection has been removed - app works without specific role
 
+    // Check if donor has completed health eligibility quiz
+    if (mounted && !roleProvider.isPatient) {
+      await _checkDonorEligibility();
+    }
+
     if (mounted) {
       _loadData();
       _loadUnreadCount();
       _loadChatUnreadCount();
     }
+  }
+
+  Future<void> _checkDonorEligibility() async {
+    try {
+      final result = await ApiService.getHealthEligibilityStatus();
+
+      if (result['success'] == true) {
+        final eligibility = result['eligibility'] as Map<String, dynamic>? ?? {};
+        final isStillValid = result['is_still_valid'] as bool? ?? true;
+        final healthQuizCompleted = eligibility['health_quiz_completed'] as bool? ?? false;
+
+        // Debug logging
+        print('DEBUG: Eligibility check result: $result');
+        print('DEBUG: health_quiz_completed: $healthQuizCompleted');
+        print('DEBUG: is_still_valid: $isStillValid');
+
+        // If health quiz not completed or eligibility is not valid, redirect to quiz
+        if (!healthQuizCompleted || !isStillValid) {
+          if (mounted) {
+            _showEligibilityRequiredDialog();
+          }
+        }
+      } else {
+        // API returned success=false
+        print('DEBUG: Eligibility API returned success=false: ${result['message']}');
+        if (mounted) {
+          _showEligibilityRequiredDialog();
+        }
+      }
+    } catch (e) {
+      // Log error and show dialog to ensure user can complete quiz
+      print('DEBUG: Eligibility check failed with error: $e');
+      if (mounted) {
+        _showEligibilityRequiredDialog();
+      }
+    }
+  }
+
+  void _showEligibilityRequiredDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.quiz,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Health Quiz Required',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Before you can start donating, please complete the health eligibility quiz. This helps ensure the safety of both donors and recipients.',
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate to health eligibility quiz
+                Navigator.pushReplacementNamed(context, AppRoutes.healthEligibilityQuiz);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text(
+                'Start Quiz',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadUnreadCount() async {
@@ -1778,7 +1885,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ),
             TextButton(
-              onPressed: () => Navigator.pushNamed(context, AppRoutes.findDonors),
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.nearbyDonorsMap),
               child: const Text('See All'),
             ),
           ],

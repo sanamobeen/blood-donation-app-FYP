@@ -38,8 +38,9 @@ ALLOWED_HOSTS = ['*']  # Allow all hosts for development (update for production)
 
 # External Pledge System: Public base URL for share links
 # Configure this to your production domain (e.g., 'https://bloodconnect.com')
-# For ngrok: 'https://6411-103-150-239-29.ngrok-free.app'
-PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', 'https://6411-103-150-239-29.ngrok-free.app')
+# For local testing: 'http://localhost:8000'
+# For ngrok (mobile testing): 'https://6411-103-150-239-29.ngrok-free.app'
+PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', 'http://localhost:8000')
 
 
 # Application definition
@@ -404,11 +405,17 @@ try:
         # Get Firebase credentials path
         firebase_credentials_path = os.environ.get('FIREBASE_CREDENTIALS_PATH')
 
+        # Resolve relative path to absolute path
+        if firebase_credentials_path and not firebase_credentials_path.startswith('/'):
+            firebase_credentials_path = str(BASE_DIR / firebase_credentials_path)
+
+        print(f"Looking for Firebase credentials at: {firebase_credentials_path}")
+
         if firebase_credentials_path and os.path.exists(firebase_credentials_path):
             cred = credentials.Certificate(firebase_credentials_path)
             initialize_app(cred, options={'project_id': 'blood-donation-chat'})
-            print("Firebase Admin SDK initialized successfully")
+            print("SUCCESS: Firebase Admin SDK initialized successfully")
         else:
-            print("Firebase credentials not found - FCM notifications will not work")
+            print("WARNING: Firebase credentials not found - FCM notifications will not work")
 except Exception as e:
-    print(f"Failed to initialize Firebase: {e}")
+    print(f"ERROR: Failed to initialize Firebase: {e}")

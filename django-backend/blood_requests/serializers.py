@@ -31,6 +31,7 @@ class BloodRequestSerializer(serializers.ModelSerializer):
             'location_lat',
             'location_lng',
             'expires_at',
+            'needed_by',  # When blood is needed by
             'status',
             'is_active',
             'created_at',
@@ -76,6 +77,13 @@ class BloodRequestSerializer(serializers.ModelSerializer):
                 )
         return value
 
+    def validate_needed_by(self, value):
+        """Validate needed_by date is in the future."""
+        from django.utils import timezone
+        if value and value < timezone.now():
+            raise serializers.ValidationError("Needed by date must be in the future.")
+        return value
+
     def create(self, validated_data):
         """Create a new blood request."""
         # If user is authenticated, associate the request with them
@@ -83,6 +91,8 @@ class BloodRequestSerializer(serializers.ModelSerializer):
         # Debug logging
         import logging
         logger = logging.getLogger(__name__)
+        logger.info(f"🐛 Serializer.create() - validated_data: {validated_data}")
+        logger.info(f"🐛 Serializer.create() - needed_by in validated_data: {validated_data.get('needed_by')}")
         logger.info(f"Blood request create - User authenticated: {request.user.is_authenticated if request else 'No request'}")
         if request and request.user.is_authenticated:
             logger.info(f"Setting requested_by to user: {request.user.email}")
@@ -149,6 +159,7 @@ class DetailedBloodRequestSerializer(serializers.ModelSerializer):
             'location_lng',
             'expires_at',
             'expires_soon',
+            'needed_by',  # When blood is needed by
             'additional_notes',
             'status',
             'is_active',
@@ -160,7 +171,7 @@ class DetailedBloodRequestSerializer(serializers.ModelSerializer):
             # Quiz responses
             'quiz_responses',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'is_urgent', 'requester_name', 'requester_profile_picture', 'units_remaining', 'requested_by_id', 'expires_soon']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'is_urgent', 'requester_name', 'requester_profile_picture', 'units_remaining', 'requested_by_id', 'expires_soon', 'needed_by']
 
     def get_units_remaining(self, obj):
         """Calculate units remaining to fulfill the request."""
@@ -216,6 +227,7 @@ class PublicBloodRequestSerializer(serializers.ModelSerializer):
             'location_lng',
             'expires_at',
             'expires_soon',
+            'needed_by',  # When blood is needed by
             'additional_notes',
             'status',
             'is_active',
@@ -224,7 +236,7 @@ class PublicBloodRequestSerializer(serializers.ModelSerializer):
             'requester_profile_picture',
             'requested_by_id',
         ]
-        read_only_fields = ['id', 'share_id', 'created_at', 'is_urgent', 'requester_name', 'requester_profile_picture', 'requested_by_id', 'expires_soon']
+        read_only_fields = ['id', 'share_id', 'created_at', 'is_urgent', 'requester_name', 'requester_profile_picture', 'requested_by_id', 'expires_soon', 'needed_by']
 
     def get_expires_soon(self, obj):
         """Check if request expires within 1 hour."""
@@ -479,9 +491,10 @@ class PublicBloodRequestPageSerializer(serializers.ModelSerializer):
             'hospital_name',
             'location',
             'expires_at',
+            'needed_by',  # When blood is needed by
             'status',
         ]
-        read_only_fields = ['share_id', 'units_pledged', 'units_received', 'responders_count']
+        read_only_fields = ['share_id', 'units_pledged', 'units_received', 'responders_count', 'needed_by']
 
 
 class BloodRequestShareSerializer(serializers.ModelSerializer):

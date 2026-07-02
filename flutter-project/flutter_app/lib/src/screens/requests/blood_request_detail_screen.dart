@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart'; // External pledge system: Share functionality
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
@@ -378,6 +379,36 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
     }
   }
 
+  /// Format the neededBy date/time in a readable format
+  String _formatNeededBy(DateTime dateTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final neededDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+    // Format time
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final timeStr = '${displayHour}:${minute.toString().padLeft(2, '0')} $amPm';
+
+    // Format date
+    if (neededDate == today) {
+      return 'Today, $timeStr';
+    } else if (neededDate == today.add(const Duration(days: 1))) {
+      return 'Tomorrow, $timeStr';
+    } else if (neededDate == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday, $timeStr';
+    } else if (dateTime.difference(now).inDays.abs() < 7) {
+      // Within a week, show day name
+      final dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dateTime.weekday - 1];
+      return '$dayName, $timeStr';
+    } else {
+      // Show full date
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}, $timeStr';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -438,6 +469,9 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
                   case 'share':
                     _shareRequest();
                     break;
+                  case 'copy_link':
+                    _copyShareLink();
+                    break;
                 }
               },
               itemBuilder: (context) => [
@@ -448,6 +482,16 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
                       Icon(Icons.share, size: 20),
                       SizedBox(width: 12),
                       Text('Share Request'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'copy_link',
+                  child: Row(
+                    children: [
+                      Icon(Icons.link, size: 20),
+                      SizedBox(width: 12),
+                      Text('Copy Link'),
                     ],
                   ),
                 ),
@@ -837,6 +881,28 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
             ),
             child: Column(
               children: [
+                // Needed by date and time
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.schedule,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Needed by: ${_formatNeededBy(_request!.neededBy)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     const Icon(
@@ -1227,24 +1293,47 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
             const SizedBox(height: 12),
           ],
 
-          // Share Request Button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _shareRequest,
-              icon: const Icon(Icons.share, size: 18),
-              label: const Text('Share Request'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: BorderSide(color: AppColors.primary),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+          // Share & Copy Link Buttons
+          Row(
+            children: [
+              // Share Button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _shareRequest,
+                  icon: const Icon(Icons.share, size: 18),
+                  label: const Text('Share'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 12),
+              // Copy Link Button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _copyShareLink,
+                  icon: const Icon(Icons.link, size: 18),
+                  label: const Text('Copy Link'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
         ],
@@ -1308,7 +1397,7 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
         bloodGroup: _request!.bloodGroup,
         unitsNeeded: _request!.unitsNeeded,
         hospitalName: _request!.hospitalName ?? 'Hospital',
-        requiredBy: '${_request!.createdAt.day}/${_request!.createdAt.month}/${_request!.createdAt.year}',
+        requiredBy: _formatNeededBy(_request!.neededBy),
         patientId: _request!.requestedById,
         onPledgeCreated: () {
           // Reload data after pledge
@@ -1346,19 +1435,21 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
 
     // Generate share link using share_id or fall back to id
     // For production: 'https://yourdomain.com/request'
-    // For local testing with ngrok: 'https://6411-103-150-239-29.ngrok-free.app/request'
-    final baseUrl = 'https://6411-103-150-239-29.ngrok-free.app/request';
+    // For local testing: 'http://localhost:8000/request'
+    // For mobile testing with ngrok: 'https://6411-103-150-239-29.ngrok-free.app/request'
+    final baseUrl = 'http://localhost:8000/request';
 
     final shareId = request.shareId ?? request.id;
     print('🐛 [_shareRequest] Selected shareId: $shareId');
     print('🐛 [_shareRequest] Using share_id: ${request.shareId != null ? 'YES ✅' : 'NO ❌ (using id instead)'}');
 
-    final shareUrl = '$baseUrl/$shareId';
+    // Remove trailing slash if present
+    final shareUrl = '$baseUrl/$shareId'.replaceAll(RegExp(r'/+$'), '');
     print('🐛 [_shareRequest] Final share URL: $shareUrl');
     print('🐛 [_shareRequest] ===== END DEBUGGING =====');
 
     // Create formatted share message
-    // URL at very end with no hashtags after it for better WhatsApp recognition
+    // URL on its own line with clear spacing for better link detection
     final shareMessage = '''
 🩸 *Urgent Blood Request Needed!*
 
@@ -1369,8 +1460,12 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
 🏥 Hospital: ${request.hospitalName ?? 'Not specified'}
 📍 Location: ${request.location ?? 'Not specified'}
 
-Help save a life! View details and pledge at:
-$shareUrl''';
+━━━━━━━━━━━━━━━━━━━━━━━
+🔗 *Tap to view & pledge:*
+
+$shareUrl
+
+━━━━━━━━━━━━━━━━━━━━━━━''';
 
     try {
       await Share.share(
@@ -1389,6 +1484,59 @@ $shareUrl''';
           ),
         );
       }
+    }
+  }
+
+  void _copyShareLink() async {
+    // Copy share link to clipboard
+    print('🐛 [_copyShareLink] Copy link button pressed');
+
+    if (_request == null) {
+      print('🐛 [_copyShareLink] ERROR: _request is null, cannot copy link!');
+      return;
+    }
+
+    final request = _request!;
+
+    // Generate share link
+    final baseUrl = 'http://localhost:8000/request';
+    final shareId = request.shareId ?? request.id;
+    final shareUrl = '$baseUrl/$shareId'.replaceAll(RegExp(r'/+$'), '');
+
+    print('🐛 [_copyShareLink] Copying URL: $shareUrl');
+
+    // Copy to clipboard
+    await Clipboard.setData(ClipboardData(text: shareUrl));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Link copied!'),
+                    Text(
+                      shareUrl,
+                      style: const TextStyle(fontSize: 11, color: Colors.white70),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.online,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 

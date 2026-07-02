@@ -240,6 +240,17 @@ def submit_quiz_responses(request):
             eligibility_record.eligibility_valid_until = timezone.now().date() + timedelta(days=30)
             eligibility_record.save()
 
+        # Update user profile health quiz completion status
+        from account.models import UserProfile
+        try:
+            user_profile = UserProfile.objects.get(user=request.user)
+            user_profile.health_quiz_completed = True
+            user_profile.health_quiz_completed_at = timezone.now()
+            user_profile.save(update_fields=['health_quiz_completed', 'health_quiz_completed_at'])
+            logger.info(f"Updated health quiz completion status for user {request.user.email}")
+        except UserProfile.DoesNotExist:
+            logger.warning(f"No profile found for user {request.user.email}")
+
         # Prepare response message
         if is_eligible:
             message = "Congratulations! You are eligible to request blood donation. You can proceed with creating your blood request."
@@ -298,19 +309,46 @@ def get_eligibility_status(request):
                     is_still_valid = False
 
             serializer = EligibilityRecordSerializer(eligibility_record)
+            response_data = serializer.data
+            response_data['is_still_valid'] = is_still_valid
+
+            # Add profile health quiz status
+            from account.models import UserProfile
+            try:
+                user_profile = UserProfile.objects.get(user=request.user)
+                response_data['health_quiz_completed'] = user_profile.health_quiz_completed
+                response_data['health_quiz_completed_at'] = user_profile.health_quiz_completed_at.isoformat() if user_profile.health_quiz_completed_at else None
+            except UserProfile.DoesNotExist:
+                response_data['health_quiz_completed'] = False
+                response_data['health_quiz_completed_at'] = None
+
             return Response({
                 'success': True,
-                'eligibility': serializer.data,
+                'eligibility': response_data,
                 'is_still_valid': is_still_valid
             }, status=status.HTTP_200_OK)
         else:
+            # No eligibility record - check profile for quiz completion
+            from account.models import UserProfile
+            health_quiz_completed = False
+            health_quiz_completed_at = None
+
+            try:
+                user_profile = UserProfile.objects.get(user=request.user)
+                health_quiz_completed = user_profile.health_quiz_completed
+                health_quiz_completed_at = user_profile.health_quiz_completed_at.isoformat() if user_profile.health_quiz_completed_at else None
+            except UserProfile.DoesNotExist:
+                pass
+
             return Response({
                 'success': True,
                 'eligibility': {
                     'is_eligible': None,
                     'last_quiz_date': None,
                     'eligibility_valid_until': None,
-                    'disqualification_reasons': []
+                    'disqualification_reasons': [],
+                    'health_quiz_completed': health_quiz_completed,
+                    'health_quiz_completed_at': health_quiz_completed_at
                 },
                 'is_still_valid': False,
                 'message': 'No eligibility record found. Please complete the health quiz.'

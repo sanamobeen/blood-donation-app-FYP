@@ -343,6 +343,7 @@ class ApiService {
     double? locationLat,
     double? locationLng,
     String? address,
+    Map<String, dynamic>? availabilityData,
   }) async {
     try {
       // Check if user is authenticated
@@ -375,6 +376,11 @@ class ApiService {
       if (locationLat != null) request.fields['location_lat'] = locationLat.toString();
       if (locationLng != null) request.fields['location_lng'] = locationLng.toString();
       if (address != null) request.fields['address'] = address;
+
+      // Add availability data (for donors)
+      if (availabilityData != null) {
+        request.fields['availability'] = jsonEncode(availabilityData);
+      }
 
       // Add profile picture if provided
       if (profilePicturePath != null) {
@@ -641,6 +647,7 @@ class ApiService {
     required int unitsNeeded,
     required String urgencyLevel,
     required String contactNumber,
+    required DateTime neededBy,
     String? hospitalName,
     String? location,
     String? additionalNotes,
@@ -651,6 +658,11 @@ class ApiService {
     try {
 
       final headers = await getAuthHeaders();
+
+      // Debug: Log the needed_by value being sent
+      print('🐛 [createBloodRequest] Sending needed_by: ${neededBy.toIso8601String()}');
+      print('🐛 [createBloodRequest] Original DateTime: $neededBy');
+
       final response = await http.post(
         Uri.parse('${ApiConfig.bloodRequestsEndpoint}/create/'),
         headers: headers,
@@ -665,6 +677,7 @@ class ApiService {
           if (additionalNotes != null && additionalNotes.isNotEmpty) 'additional_notes': additionalNotes,
           if (locationLat != null && locationLng != null) 'location_lat': locationLat,
           if (locationLat != null && locationLng != null) 'location_lng': locationLng,
+          if (neededBy != null) 'needed_by': neededBy.toIso8601String(),
           if (quizResponses != null) 'quiz_responses': quizResponses,
         }),
       );
@@ -1269,6 +1282,103 @@ class ApiService {
         return {
           'success': false,
           'message': data['message'] ?? 'Failed to check eligibility'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  // ===== Health Eligibility Quiz API =====
+
+  /// Get health eligibility quiz questions
+  static Future<Map<String, dynamic>> getHealthQuiz() async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.healthEndpoint}/quiz/'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'questions': data['questions'] ?? [],
+          'message': data['message'] ?? 'Questions loaded successfully'
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Failed to load quiz questions'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Submit health eligibility quiz responses
+  static Future<Map<String, dynamic>> submitHealthQuiz(Map<String, String> responses) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      // Backend expects responses as a dictionary: {"question_id": "answer"}
+      final responsesData = <String, String>{};
+      for (var entry in responses.entries) {
+        responsesData[entry.key] = entry.value;
+      }
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.healthEndpoint}/quiz/submit/'),
+        headers: headers,
+        body: jsonEncode({'responses': responsesData}),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {
+          'success': true,
+          'data': data['data'] ?? {},
+          'message': data['message'] ?? 'Quiz submitted successfully'
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Failed to submit quiz'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Get health eligibility status
+  static Future<Map<String, dynamic>> getHealthEligibilityStatus() async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.healthEndpoint}/eligibility/'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'eligibility': data['eligibility'] ?? {},
+          'is_still_valid': data['is_still_valid'] ?? true,
+          'message': data['message'] ?? 'Eligibility status retrieved'
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Failed to fetch eligibility status'
         };
       }
     } catch (e) {
@@ -2775,6 +2885,7 @@ class ApiService {
     String? locationLat,
     String? locationLng,
     String? address,
+    Map<String, dynamic>? availabilityData,
   }) async {
     try {
       final headers = await getAuthHeaders();
@@ -2791,6 +2902,7 @@ class ApiService {
       if (locationLat != null && locationLat.isNotEmpty) requestBody['location_lat'] = double.tryParse(locationLat);
       if (locationLng != null && locationLng.isNotEmpty) requestBody['location_lng'] = double.tryParse(locationLng);
       if (address != null && address.isNotEmpty) requestBody['address'] = address;
+      if (availabilityData != null) requestBody['availability'] = availabilityData;
 
       final response = await http.patch(
         Uri.parse('${ApiConfig.authEndpoint}/profile/update-combined/'),

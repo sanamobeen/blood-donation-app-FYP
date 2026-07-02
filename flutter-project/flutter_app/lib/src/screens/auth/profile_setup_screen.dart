@@ -6,9 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/buttons/primary_button.dart';
+import '../../widgets/availability_scheduler.dart';
 import '../../services/api_service.dart';
 import '../../models/profile.dart';
 import '../../models/selected_location.dart';
+import '../../models/donor_availability.dart';
 import '../location/location_picker_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
@@ -58,8 +60,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     'Quetta',
   ];
 
-  // Available to donate
-  bool _availableToDonate = true;
+  // Donor availability data
+  DonorAvailability? _donorAvailability;
 
   @override
   void initState() {
@@ -225,6 +227,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         address: _userRole == 'donor' && _selectedLocation != null
             ? _selectedLocation!.fullAddress
             : null,
+        // Availability data (only for donors)
+        availabilityData: _userRole == 'donor' && _donorAvailability != null
+            ? _donorAvailability!.toJson()
+            : null,
       );
 
       setState(() {
@@ -249,10 +255,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           }
 
 
-          // Profile created successfully - navigate to unified main navigation
+          // Profile created successfully - navigate based on user role
           // The main navigation screen will show the appropriate UI based on user's role
           if (mounted) {
-            Navigator.pushReplacementNamed(context, AppRoutes.mainNavigation);
+            // For donors: Navigate to Health Eligibility Quiz first
+            if (_userRole == 'donor') {
+              Navigator.pushReplacementNamed(context, AppRoutes.healthEligibilityQuiz);
+            } else {
+              // For patients: Go directly to main navigation
+              Navigator.pushReplacementNamed(context, AppRoutes.mainNavigation);
+            }
           }
         }
       } else {
@@ -939,34 +951,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     const SizedBox(height: 2),
                   ],
 
-                  // Available to Donate Section
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.bloodtype,
-                        color: AppColors.primary,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Available to donate',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const Spacer(),
-                      Switch(
-                        value: _availableToDonate,
-                        onChanged: (value) {
-                          setState(() {
-                            _availableToDonate = value;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
+                  // Available to Donate Section (only for donors)
+                  if (_userRole == 'donor')
+                    AvailabilityScheduler(
+                      initialAvailability: _donorAvailability,
+                      onAvailabilityChanged: (availability) {
+                        setState(() {
+                          _donorAvailability = availability;
+                        });
+                      },
+                    ),
                 ],
               ),
             ),

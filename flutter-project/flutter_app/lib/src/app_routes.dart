@@ -15,14 +15,13 @@ import 'screens/donations/my_donations_screen.dart';
 // import 'screens/home/home_screen.dart'; // Removed - using MainNavigationScreen instead
 import 'screens/messages/messages_screen.dart';
 import 'screens/notifications/notifications_screen_api.dart';
+import 'screens/notifications/notification_detail_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/onboarding/onboarding_screen_2.dart';
 import 'screens/onboarding/onboarding_screen3.dart';
 import 'screens/patient_home/patient_home_screen.dart';
-// Quiz feature removed from donor side
-// import 'screens/quiz/health_eligibility_quiz_screen.dart';
+import 'screens/quiz/health_eligibility_quiz_screen.dart';
 import 'screens/donors/donor_profile_screen.dart';
-import 'screens/donors/find_donors_screen.dart';
 import 'screens/map/unified_map_screen.dart';
 import 'screens/patient/nearby_donors_map_screen.dart';
 import 'screens/patient/all_responding_donors_screen.dart';
@@ -31,7 +30,7 @@ import 'screens/profile/edit_profile_screen.dart';
 import 'screens/requests/my_requests_screen.dart';
 import 'screens/requests/nearby_requests_screen.dart';
 import 'screens/role_selection/role_selection_screen.dart';
-import 'screens/sos/sos_screen.dart';
+import 'screens/sos/sos_screen_api.dart';
 import 'screens/sos/sos_active_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -63,7 +62,6 @@ class AppRoutes {
   static const sosActive = '/sos-active';
   static const myDonations = '/my-donations';
   static const donorProfile = '/donor-profile';
-  static const findDonors = '/find-donors';
   static const unifiedMap = '/unified-map';
   static const nearbyDonorsMap = '/nearby-donors-map';
   static const myRequests = '/my-requests';
@@ -71,14 +69,12 @@ class AppRoutes {
   static const messages = '/messages';
   static const chatList = '/chat-list';
   static const notifications = '/notifications';
+  static const notificationDetail = '/notification-detail';
   static const profile = '/profile';
   static const editProfile = '/edit-profile';
   static const patientHome = '/patient-home';
-  // Quiz screen removed from patient flow
-  // static const patientQuiz = '/patient-quiz';
   static const bloodRequestForm = '/blood-request-form';
-  // Quiz feature removed from donor side
-  // static const healthEligibilityQuiz = '/health-eligibility-quiz';
+  static const healthEligibilityQuiz = '/health-eligibility-quiz';
   static const aiChatbot = '/ai-chatbot';
   static const settings = '/settings';
   static const help = '/help';
@@ -106,9 +102,8 @@ class AppRoutes {
     profileSetup: (context) => const ProfileSetupScreen(),
     home: (context) => const MainNavigationScreen(), // Redirect to MainNavigationScreen
     mainNavigation: (context) => const MainNavigationScreen(),
-    sos: (context) => const SOSScreen(),
+    sos: (context) => const SOSScreenApi(),
     sosActive: (context) => const SOSActiveScreen(),
-    findDonors: (context) => const FindDonorsScreen(),
     unifiedMap: (context) => const UnifiedMapScreen(),
     donorProfile: (context) {
       final donor = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
@@ -120,6 +115,10 @@ class AppRoutes {
     messages: (context) => const MessagesScreen(),
     chatList: (context) => const MessagesScreen(),
     notifications: (context) => const NotificationsScreenApi(),
+    notificationDetail: (context) {
+      final notification = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+      return NotificationDetailScreen(notification: notification);
+    },
     myDonations: (context) => const MyDonationsScreen(),
     profile: (context) => const ProfileScreen(),
     editProfile: (context) => const EditProfileScreen(),
@@ -127,8 +126,7 @@ class AppRoutes {
     // Quiz screen removed from patient flow
     // patientQuiz: (context) => const PatientQuizScreen(),
     bloodRequestForm: (context) => const BloodRequestFormScreen(),
-    // Quiz feature removed from donor side
-    // healthEligibilityQuiz: (context) => const HealthEligibilityQuizScreen(),
+    healthEligibilityQuiz: (context) => const HealthEligibilityQuizScreen(),
     aiChatbot: (context) => const AIChatbotScreen(),
     settings: (context) => const SettingsScreen(),
     help: (context) => const HelpScreen(),

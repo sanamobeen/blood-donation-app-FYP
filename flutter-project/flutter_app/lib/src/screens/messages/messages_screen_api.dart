@@ -333,7 +333,7 @@ class _MessagesScreenApiState extends State<MessagesScreenApi> {
 
   Widget _buildBottomNavigationBar() {
     return UnifiedBottomNavigationBar(
-      selectedIndex: 3, // Chat is index 3
+      selectedIndex: 2, // Chat is index 2 (Home=0, Request=1, Chat=2, Profile=3)
       onItemTapped: (index) {
         // Handle navigation taps from MessagesScreen
         switch (index) {
@@ -343,13 +343,10 @@ class _MessagesScreenApiState extends State<MessagesScreenApi> {
           case 1: // Requests
             Navigator.pushReplacementNamed(context, AppRoutes.nearbyRequests);
             break;
-          case 2: // Map
-            Navigator.pushReplacementNamed(context, AppRoutes.findDonors);
-            break;
-          case 3: // Chat (already here, do nothing or refresh)
+          case 2: // Chat (already here, do nothing or refresh)
             // Already on chat screen
             break;
-          case 4: // Profile
+          case 3: // Profile
             Navigator.pushReplacementNamed(context, AppRoutes.settings);
             break;
         }

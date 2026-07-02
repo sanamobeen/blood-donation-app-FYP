@@ -128,6 +128,11 @@ class BloodRequest(models.Model):
         help_text="When this request automatically expires"
     )
 
+    # When blood is needed by (patient deadline)
+    needed_by = models.DateTimeField(
+        help_text="Date and time when blood is needed by"
+    )
+
     # Phase 4: Track the currently active (confirmed) donor to prevent race conditions
     # This field will be populated when a patient confirms a pledge
     active_donor_pledge_id = models.UUIDField(
@@ -328,6 +333,52 @@ class DonorResponse(models.Model):
         null=True,
         help_text="Note from donor to patient"
     )
+
+    # External donor fields (for pledges via public link)
+    donor_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Name of external donor (no account)"
+    )
+    donor_phone = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Phone number of external donor"
+    )
+    donor_blood_group = models.CharField(
+        max_length=5,
+        blank=True,
+        null=True,
+        help_text="Blood group of external donor"
+    )
+    donor_location_lat = models.DecimalField(
+        max_digits=10,
+        decimal_places=7,
+        blank=True,
+        null=True,
+        help_text="Latitude of external donor's location"
+    )
+    donor_location_lng = models.DecimalField(
+        max_digits=10,
+        decimal_places=7,
+        blank=True,
+        null=True,
+        help_text="Longitude of external donor's location"
+    )
+    donor_address = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Address of external donor"
+    )
+    donor_city = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="City of external donor"
+    )
+
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -475,90 +526,3 @@ class DonorResponse(models.Model):
         """Days since pledge was created"""
         from django.utils import timezone
         return (timezone.now() - self.created_at).days
-
-
-class PatientQuiz(models.Model):
-    """
-    Patient medical quiz responses for blood requests.
-    Stores structured answers to medical history questions.
-    """
-
-    QUIZ_QUESTIONS = [
-        ('had_blood_transfusion', 'Has the patient had a blood transfusion in the last 3 months?'),
-        ('had_tattoo_piercing', 'Has the patient had any tattoos or piercings in the last 6 months?'),
-        ('had_surgery', 'Has the patient had any major surgery in the last 6 months?'),
-        ('on_medication', 'Is the patient currently on any medication?'),
-        ('has_chronic_disease', 'Does the patient have any chronic diseases (diabetes, hypertension, etc.)?'),
-        ('traveled_malaria_area', 'Has the patient traveled to any malaria-prone areas in the last 12 months?'),
-    ]
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    blood_request = models.OneToOneField(
-        BloodRequest,
-        on_delete=models.CASCADE,
-        related_name='patient_quiz',
-        help_text="Associated blood request"
-    )
-
-    # Quiz responses
-    had_blood_transfusion = models.BooleanField(
-        default=False,
-        help_text="Had blood transfusion in last 3 months"
-    )
-    had_tattoo_piercing = models.BooleanField(
-        default=False,
-        help_text="Had tattoos or piercings in last 6 months"
-    )
-    had_surgery = models.BooleanField(
-        default=False,
-        help_text="Had major surgery in last 6 months"
-    )
-    on_medication = models.BooleanField(
-        default=False,
-        help_text="Currently on medication"
-    )
-    has_chronic_disease = models.BooleanField(
-        default=False,
-        help_text="Has chronic diseases"
-    )
-    traveled_malaria_area = models.BooleanField(
-        default=False,
-        help_text="Traveled to malaria-prone areas in last 12 months"
-    )
-
-    # Additional medical information
-    other_medical_info = models.TextField(
-        blank=True,
-        null=True,
-        help_text="Additional medical information provided by patient"
-    )
-
-    # Timestamps
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "Patient Quiz"
-        verbose_name_plural = "Patient Quizzes"
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"Quiz for {self.blood_request.patient_name}"
-
-    def get_quiz_summary(self):
-        """Get a summary of quiz responses for quick viewing"""
-        positive_responses = []
-        if self.had_blood_transfusion:
-            positive_responses.append("Blood transfusion")
-        if self.had_tattoo_piercing:
-            positive_responses.append("Tattoos/piercings")
-        if self.had_surgery:
-            positive_responses.append("Recent surgery")
-        if self.on_medication:
-            positive_responses.append("On medication")
-        if self.has_chronic_disease:
-            positive_responses.append("Chronic disease")
-        if self.traveled_malaria_area:
-            positive_responses.append("Malaria area travel")
-
-        return positive_responses if positive_responses else ["No risk factors"]
