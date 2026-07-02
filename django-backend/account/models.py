@@ -299,6 +299,17 @@ class UserProfile(models.Model):
         help_text="Date of last blood donation"
     )
 
+    # Donor Availability Schedule (Day and Time slots)
+    available_all_day = models.BooleanField(
+        default=False,
+        help_text="Whether the donor is available all day, every day"
+    )
+    availability = models.JSONField(
+        blank=True,
+        null=True,
+        help_text="Donor availability schedule by day and time slots. Format: {'monday': ['8am_10am', '4pm_6pm'], 'tuesday': [...], ...}"
+    )
+
     # Health Quiz Status
     health_quiz_completed = models.BooleanField(
         default=False,

@@ -343,6 +343,7 @@ class ApiService {
     double? locationLat,
     double? locationLng,
     String? address,
+    Map<String, dynamic>? availabilityData,
   }) async {
     try {
       // Check if user is authenticated
@@ -375,6 +376,11 @@ class ApiService {
       if (locationLat != null) request.fields['location_lat'] = locationLat.toString();
       if (locationLng != null) request.fields['location_lng'] = locationLng.toString();
       if (address != null) request.fields['address'] = address;
+
+      // Add availability data (for donors)
+      if (availabilityData != null) {
+        request.fields['availability'] = jsonEncode(availabilityData);
+      }
 
       // Add profile picture if provided
       if (profilePicturePath != null) {
@@ -652,6 +658,11 @@ class ApiService {
     try {
 
       final headers = await getAuthHeaders();
+
+      // Debug: Log the needed_by value being sent
+      print('🐛 [createBloodRequest] Sending needed_by: ${neededBy.toIso8601String()}');
+      print('🐛 [createBloodRequest] Original DateTime: $neededBy');
+
       final response = await http.post(
         Uri.parse('${ApiConfig.bloodRequestsEndpoint}/create/'),
         headers: headers,
@@ -2874,6 +2885,7 @@ class ApiService {
     String? locationLat,
     String? locationLng,
     String? address,
+    Map<String, dynamic>? availabilityData,
   }) async {
     try {
       final headers = await getAuthHeaders();
@@ -2890,6 +2902,7 @@ class ApiService {
       if (locationLat != null && locationLat.isNotEmpty) requestBody['location_lat'] = double.tryParse(locationLat);
       if (locationLng != null && locationLng.isNotEmpty) requestBody['location_lng'] = double.tryParse(locationLng);
       if (address != null && address.isNotEmpty) requestBody['address'] = address;
+      if (availabilityData != null) requestBody['availability'] = availabilityData;
 
       final response = await http.patch(
         Uri.parse('${ApiConfig.authEndpoint}/profile/update-combined/'),
