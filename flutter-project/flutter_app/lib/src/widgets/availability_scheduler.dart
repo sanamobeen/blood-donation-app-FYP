@@ -55,8 +55,8 @@ class _AvailabilitySchedulerState extends State<AvailabilityScheduler> {
         _timeSlotsPerDay.remove(day);
       } else {
         _selectedDays.add(day);
-        // Default to all available time slots for new day
-        _timeSlotsPerDay[day] = List.from(DonorAvailability.timeSlotIds);
+        // Start with empty time slots for new day - user will select specific slots
+        _timeSlotsPerDay[day] = [];
       }
       _notifyAvailabilityChanged();
     });
