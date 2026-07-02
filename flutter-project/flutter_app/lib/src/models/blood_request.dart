@@ -76,6 +76,11 @@ class BloodRequest {
     final shareIdValue = json['share_id']?.toString();
     print('🐛 [BloodRequest.fromJson] share_id parsed value: $shareIdValue');
 
+    // Debug: Log the needed_by value received from backend
+    final parsedNeededBy = _parseRequiredDateTime(json['needed_by']);
+    print('🐛 [BloodRequest.fromJson] Raw needed_by from backend: ${json['needed_by']}');
+    print('🐛 [BloodRequest.fromJson] Parsed neededBy: $parsedNeededBy');
+
     // Safe parsing with null checks and defaults
     return BloodRequest(
       id: json['id']?.toString() ?? '',
@@ -92,7 +97,7 @@ class BloodRequest {
       locationLat: _parseNullableDouble(json['location_lat']),
       locationLng: _parseNullableDouble(json['location_lng']),
       additionalNotes: json['additional_notes']?.toString(),
-      neededBy: _parseRequiredDateTime(json['needed_by']),
+      neededBy: parsedNeededBy,
       status: json['status']?.toString() ?? 'pending',
       isActive: json['is_active'] is bool ? json['is_active'] as bool : json['is_active']?.toString() == 'true',
       createdAt: _parseRequiredDateTime(json['created_at']),

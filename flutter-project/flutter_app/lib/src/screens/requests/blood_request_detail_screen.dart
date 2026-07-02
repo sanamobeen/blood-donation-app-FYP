@@ -379,6 +379,36 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
     }
   }
 
+  /// Format the neededBy date/time in a readable format
+  String _formatNeededBy(DateTime dateTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final neededDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+    // Format time
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final timeStr = '${displayHour}:${minute.toString().padLeft(2, '0')} $amPm';
+
+    // Format date
+    if (neededDate == today) {
+      return 'Today, $timeStr';
+    } else if (neededDate == today.add(const Duration(days: 1))) {
+      return 'Tomorrow, $timeStr';
+    } else if (neededDate == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday, $timeStr';
+    } else if (dateTime.difference(now).inDays.abs() < 7) {
+      // Within a week, show day name
+      final dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][dateTime.weekday - 1];
+      return '$dayName, $timeStr';
+    } else {
+      // Show full date
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}, $timeStr';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -851,6 +881,28 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
             ),
             child: Column(
               children: [
+                // Needed by date and time
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.schedule,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Needed by: ${_formatNeededBy(_request!.neededBy)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     const Icon(
@@ -1345,7 +1397,7 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
         bloodGroup: _request!.bloodGroup,
         unitsNeeded: _request!.unitsNeeded,
         hospitalName: _request!.hospitalName ?? 'Hospital',
-        requiredBy: '${_request!.createdAt.day}/${_request!.createdAt.month}/${_request!.createdAt.year}',
+        requiredBy: _formatNeededBy(_request!.neededBy),
         patientId: _request!.requestedById,
         onPledgeCreated: () {
           // Reload data after pledge

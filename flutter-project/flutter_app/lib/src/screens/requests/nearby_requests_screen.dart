@@ -10,6 +10,7 @@ import '../../app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../models/blood_request.dart';
+import '../../models/donor_availability.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import 'blood_request_detail_screen.dart';
 import '../../widgets/pledge_dialog.dart';
@@ -35,6 +36,9 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
   // User's blood group for filtering
   String? _userBloodGroup;
   List<String> _compatibleBloodGroups = [];
+
+  // Donor's availability data
+  DonorAvailability? _donorAvailability;
 
   // Donor's profile location (from their profile, not GPS)
   double? _donorProfileLat;
@@ -103,6 +107,17 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
                 _donorProfileLng = lng;
                 _donorCity = profile['city']?.toString();
               });
+            }
+          }
+
+          // Load donor's availability data
+          if (profile['availability'] != null) {
+            try {
+              setState(() {
+                _donorAvailability = DonorAvailability.fromJson(profile['availability']);
+              });
+            } catch (e) {
+              debugPrint('Error loading availability: $e');
             }
           }
         }
@@ -312,7 +327,7 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
         bloodGroup: request.bloodGroup,
         unitsNeeded: request.unitsNeeded,
         hospitalName: request.hospitalName ?? 'Hospital',
-        requiredBy: '${request.createdAt.day}/${request.createdAt.month}/${request.createdAt.year}',
+        requiredBy: _formatNeededByTime(request.neededBy),
         onPledgeCreated: () {
           // Add to pledged set and reload requests after pledge
           setState(() {
@@ -373,6 +388,49 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
     }
   }
 
+  /// Get time slot ID from hour (0-23)
+  /// Returns the 2-hour time slot ID for the given hour
+  String _getTimeSlotFromHour(int hour) {
+    if (hour >= 0 && hour < 2) return '12am_2am';
+    if (hour >= 2 && hour < 4) return '2am_4am';
+    if (hour >= 4 && hour < 6) return '4am_6am';
+    if (hour >= 6 && hour < 8) return '6am_8am';
+    if (hour >= 8 && hour < 10) return '8am_10am';
+    if (hour >= 10 && hour < 12) return '10am_12pm';
+    if (hour >= 12 && hour < 14) return '12pm_2pm';
+    if (hour >= 14 && hour < 16) return '2pm_4pm';
+    if (hour >= 16 && hour < 18) return '4pm_6pm';
+    if (hour >= 18 && hour < 20) return '6pm_8pm';
+    if (hour >= 20 && hour < 22) return '8pm_10pm';
+    return '10pm_12am'; // 22-23
+  }
+
+  /// Check if donor is available for the given blood request
+  /// Returns true if donor is available during the request's needed time
+  bool _isDonorAvailableForRequest(BloodRequest request) {
+    // If no availability data set, show all requests
+    if (_donorAvailability == null) return true;
+
+    // If donor is available all day, show all requests
+    if (_donorAvailability!.availableAllDay) return true;
+
+    // FIX: Convert UTC to local time before checking availability
+    // The backend stores neededBy in UTC, but donor availability is in local time
+    final localNeededBy = request.neededBy.toLocal();
+
+    // Get the day of week from neededBy date (using local time)
+    final dayName = DonorAvailability.daysOfWeek[localNeededBy.weekday - 1]; // weekday is 1-7, daysOfWeek is 0-indexed
+
+    // Check if donor is available on this day
+    if (!_donorAvailability!.isAvailableOnDay(dayName)) return false;
+
+    // Get the time slot from the neededBy hour (using local time)
+    final timeSlotId = _getTimeSlotFromHour(localNeededBy.hour);
+
+    // Check if donor is available during this time slot
+    return _donorAvailability!.isAvailableAtTime(dayName, timeSlotId);
+  }
+
   List<BloodRequest> get _filteredRequests {
     if (_requestsResponse == null) return [];
 
@@ -391,10 +449,13 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
       filtered = requests;
     }
 
+    // Then filter by donor availability time slots
+    filtered = filtered.where((r) => _isDonorAvailableForRequest(r)).toList();
+
     // Then apply additional filters
     switch (_selectedFilter) {
       case 'All':
-        // Already filtered by blood group above
+        // Already filtered by blood group and availability above
         break;
       case 'Urgent':
         filtered = filtered.where((r) => r.urgencyLevel == 'urgent').toList();
@@ -466,6 +527,39 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
       return '${difference.inDays}d';
     } else {
       return '${dateTime.day}/${dateTime.month}';
+    }
+  }
+
+  /// Format the neededBy date/time in a readable format for the card
+  String _formatNeededByTime(DateTime dateTime) {
+    // FIX: Convert UTC to local time for display
+    // The backend stores neededBy in UTC, but users expect to see local time
+    final localDateTime = dateTime.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final neededDate = DateTime(localDateTime.year, localDateTime.month, localDateTime.day);
+
+    // Format time (using local time)
+    final hour = localDateTime.hour;
+    final minute = localDateTime.minute;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final timeStr = '${displayHour}:${minute.toString().padLeft(2, '0')} $amPm';
+
+    // Format date (using local time)
+    if (neededDate == today) {
+      return 'Today, $timeStr';
+    } else if (neededDate == today.add(const Duration(days: 1))) {
+      return 'Tomorrow, $timeStr';
+    } else if (neededDate == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday, $timeStr';
+    } else if (localDateTime.difference(now).inDays.abs() < 7) {
+      // Within a week, show day name
+      final dayName = DonorAvailability.daysOfWeek[localDateTime.weekday - 1];
+      return '${DonorAvailability.getShortDayName(dayName)}, $timeStr';
+    } else {
+      // Show date
+      return '${localDateTime.day}/${localDateTime.month}, $timeStr';
     }
   }
 
@@ -891,6 +985,7 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
             hospital: bloodRequest.hospitalName ?? 'Location specified',
             distance: distanceText,
             time: _getTimeAgo(bloodRequest.createdAt),
+            neededBy: _formatNeededByTime(bloodRequest.neededBy),
             priority: bloodRequest.urgencyLevel,
             priorityColor: priorityColor,
             requestId: bloodRequest.id,
@@ -1338,6 +1433,7 @@ class _RequestCard extends StatelessWidget {
   final String hospital;
   final String distance;
   final String time;
+  final String? neededBy; // New: Patient's needed date/time
   final String priority;
   final Color priorityColor;
   final VoidCallback onTap;
@@ -1354,6 +1450,7 @@ class _RequestCard extends StatelessWidget {
     required this.hospital,
     required this.distance,
     required this.time,
+    this.neededBy,
     required this.priority,
     required this.priorityColor,
     required this.onTap,
@@ -1476,6 +1573,20 @@ class _RequestCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
+                          // Show needed by time if available, otherwise show time ago
+                          if (neededBy != null) ...[
+                            const Icon(Icons.schedule, size: 12, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              neededBy!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           const Icon(Icons.access_time, size: 12, color: AppColors.textSecondary),
                           const SizedBox(width: 4),
                           Text(

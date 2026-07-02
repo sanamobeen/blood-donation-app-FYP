@@ -8,9 +8,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/buttons/primary_button.dart';
+import '../../widgets/availability_scheduler.dart';
 import '../../services/api_service.dart';
 import '../../models/profile.dart';
 import '../../models/selected_location.dart';
+import '../../models/donor_availability.dart';
 import '../location/location_picker_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -69,9 +71,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'Quetta',
   ];
 
-  // Available to donate
-  bool _availableToDonate = true;
-  bool? _originalAvailableToDonate;
+  // Donor availability data
+  DonorAvailability? _donorAvailability;
+  DonorAvailability? _originalAvailability;
 
   // Basic info
   final TextEditingController _fullNameController = TextEditingController();
@@ -166,8 +168,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _originalLocation = _selectedLocation;
           }
 
-          // Load availability status (from profile data if available)
-          // This would need to be added to the API response
+          // Load availability data (if available)
+          if (profileData['availability'] != null) {
+            try {
+              _donorAvailability = DonorAvailability.fromJson(profileData['availability']);
+              _originalAvailability = _donorAvailability;
+            } catch (e) {
+              // If availability data is malformed, ignore it
+              debugPrint('Error loading availability: $e');
+            }
+          }
         } else {
           _errorMessage = result['message'] ?? 'Failed to load profile';
         }
@@ -186,7 +196,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _selectedCity != _originalCity ||
           _selectedDate != _originalDate ||
           _profileImagePath != null ||
-          (_userRole == 'donor' && _selectedLocation != _originalLocation);
+          (_userRole == 'donor' && _selectedLocation != _originalLocation) ||
+          (_userRole == 'donor' && _donorAvailability != _originalAvailability);
     });
   }
 
@@ -361,6 +372,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             : null,
         address: _userRole == 'donor' && _selectedLocation != null
             ? _selectedLocation!.fullAddress
+            : null,
+        availabilityData: _userRole == 'donor' && _donorAvailability != null
+            ? _donorAvailability!.toJson()
             : null,
       );
 
@@ -945,6 +959,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ],
                           ),
                         ),
+                      ),
+                    const SizedBox(height: 16),
+
+                    // Availability Section (only for donors)
+                    if (_userRole == 'donor')
+                      AvailabilityScheduler(
+                        initialAvailability: _donorAvailability,
+                        onAvailabilityChanged: (availability) {
+                          setState(() {
+                            _donorAvailability = availability;
+                          });
+                          _checkForChanges();
+                        },
                       ),
                   ],
                 ],

@@ -112,13 +112,35 @@ def blood_request_list(request):
         # Order by urgency (critical first) and then by date
         queryset = queryset.order_by('-urgency_level', '-created_at')
 
+        # Apply availability filtering for authenticated donors
+        if request.user and request.user.is_authenticated:
+            donor_profile = getattr(request.user, 'profile', None)
+            if donor_profile:
+                from .utils import filter_requests_by_availability
+                # Convert queryset to list and filter by availability
+                all_requests = list(queryset)
+                filtered_requests = filter_requests_by_availability(
+                    all_requests, donor_profile, timezone.now()
+                )
+                logger.info(f"Filtered blood requests by availability: {len(filtered_requests)}/{len(all_requests)}")
+                queryset = filtered_requests
+
         serializer = PublicBloodRequestSerializer(queryset, many=True)
+
+        # Get count - handle both QuerySet and list
+        # Note: hasattr() doesn't work here because list also has count() method (but requires argument)
+        # Use isinstance to check if it's a QuerySet
+        from django.db.models import QuerySet
+        if isinstance(queryset, QuerySet):
+            count = queryset.count()
+        else:
+            count = len(queryset)
 
         return success_response(
             message='Blood requests retrieved successfully.',
             data={
                 'blood_requests': serializer.data,
-                'count': queryset.count()
+                'count': count
             }
         )
 
@@ -166,6 +188,7 @@ def blood_request_create(request):
         logger.info(f"Blood request create data: {request.data}")
         logger.info(f"location_lat: {request.data.get('location_lat')}")
         logger.info(f"location_lng: {request.data.get('location_lng')}")
+        logger.info(f"🐛 NEEDED_BY from frontend: {request.data.get('needed_by')}")
 
         serializer = BloodRequestSerializer(
             data=request.data,
@@ -173,8 +196,12 @@ def blood_request_create(request):
         )
 
         if serializer.is_valid():
+            logger.info(f"🐛 Serializer validated_data: {serializer.validated_data}")
+            logger.info(f"🐛 Serializer validated_data needed_by: {serializer.validated_data.get('needed_by')}")
+
             blood_request = serializer.save()
             logger.info(f"Blood request saved - lat: {blood_request.location_lat}, lng: {blood_request.location_lng}")
+            logger.info(f"🐛 SAVED blood_request.needed_by: {blood_request.needed_by}")
 
             # Create PatientQuiz record if quiz_responses were provided
             quiz_responses = request.data.get('quiz_responses')
@@ -593,22 +620,66 @@ def nearby_blood_requests(request):
         # CRITICAL FIX: Calculate distances and filter by radius
         # Distance = DONOR_LOCATION <-> REQUEST_LOCATION (not self)
         requests_data = []
-        for req in queryset:
-            # Skip if request doesn't have location
-            if not req.location_lat or not req.location_lng:
-                continue
 
-            # CRITICAL: Calculate distance from DONOR to REQUEST location
-            distance = haversine_distance(
-                donor_lat, donor_lng,  # Donor's location
-                req.location_lat, req.location_lng  # Request (patient) location
+        # Get donor profile for availability filtering
+        donor_profile = None
+        if request.user and request.user.is_authenticated:
+            donor_profile = getattr(request.user, 'profile', None)
+
+        # Convert queryset to list for availability filtering
+        all_requests = list(queryset)
+
+        # Apply availability filtering if donor profile exists
+        if donor_profile:
+            from .utils import filter_requests_by_availability
+            filtered_by_location = []
+
+            for req in all_requests:
+                # Skip if request doesn't have location
+                if not req.location_lat or not req.location_lng:
+                    continue
+
+                # CRITICAL: Calculate distance from DONOR to REQUEST location
+                distance = haversine_distance(
+                    donor_lat, donor_lng,  # Donor's location
+                    req.location_lat, req.location_lng  # Request (patient) location
+                )
+
+                # Only include requests within radius
+                if distance <= radius:
+                    # Add distance to request object temporarily for filtering
+                    req.distance_km = round(distance, 1)
+                    filtered_by_location.append(req)
+
+            # Now filter by availability
+            availability_filtered = filter_requests_by_availability(
+                filtered_by_location, donor_profile, timezone.now()
             )
 
-            # Only include requests within radius
-            if distance <= radius:
+            for req in availability_filtered:
                 request_dict = PublicBloodRequestSerializer(req).data
-                request_dict['distance_km'] = round(distance, 1)
+                request_dict['distance_km'] = getattr(req, 'distance_km', 0)
                 requests_data.append(request_dict)
+
+            logger.info(f"Filtered to {len(requests_data)} requests by availability from {len(filtered_by_location)} within radius")
+        else:
+            # No authenticated user, skip availability filtering
+            for req in all_requests:
+                # Skip if request doesn't have location
+                if not req.location_lat or not req.location_lng:
+                    continue
+
+                # CRITICAL: Calculate distance from DONOR to REQUEST location
+                distance = haversine_distance(
+                    donor_lat, donor_lng,  # Donor's location
+                    req.location_lat, req.location_lng  # Request (patient) location
+                )
+
+                # Only include requests within radius
+                if distance <= radius:
+                    request_dict = PublicBloodRequestSerializer(req).data
+                    request_dict['distance_km'] = round(distance, 1)
+                    requests_data.append(request_dict)
 
         # Sort by latest requests first (newest created_at), then by distance (nearest for same date)
         # Use stable sort: sort by secondary key first, then by primary key

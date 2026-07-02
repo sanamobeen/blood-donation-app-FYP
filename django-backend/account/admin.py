@@ -56,8 +56,8 @@ class CustomUserAdmin(BaseUserAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('get_user_email', 'get_role_badge', 'blood_group', 'city', 'has_location', 'has_health_quiz', 'gender', 'weight', 'is_available')
-    list_filter = ('role', 'blood_group', 'city', 'gender', 'health_quiz_completed', 'is_available_for_donation')
+    list_display = ('get_user_email', 'get_role_badge', 'blood_group', 'city', 'has_location', 'has_health_quiz', 'gender', 'weight', 'is_available', 'availability_status')
+    list_filter = ('role', 'blood_group', 'city', 'gender', 'health_quiz_completed', 'is_available_for_donation', 'available_all_day')
     search_fields = ('user__email', 'user__full_name', 'city')
 
     fieldsets = (
@@ -68,13 +68,13 @@ class UserProfileAdmin(admin.ModelAdmin):
             'fields': ('blood_group', 'date_of_birth', 'gender', 'weight')
         }),
         ('Location Information', {
-            'fields': ('city', 'location_lat', 'location_lng')
+            'fields': ('city', 'location_lat', 'location_lng', 'address')
         }),
         ('Health Quiz Status', {
             'fields': ('health_quiz_completed', 'health_quiz_completed_at')
         }),
         ('Donation Availability', {
-            'fields': ('is_available_for_donation', 'last_donation_date')
+            'fields': ('is_available_for_donation', 'last_donation_date', 'available_all_day', 'availability')
         }),
     )
 
@@ -130,6 +130,17 @@ class UserProfileAdmin(admin.ModelAdmin):
         return obj.is_available_for_donation
     is_available.short_description = 'Available'
     is_available.boolean = True
+
+    def availability_status(self, obj):
+        """Show donor availability status"""
+        if obj.available_all_day:
+            return 'All Day'
+        if obj.availability and isinstance(obj.availability, dict):
+            # Count how many days have time slots
+            days_with_slots = sum(1 for slots in obj.availability.values() if slots)
+            return f'{days_with_slots} days'
+        return 'Not set'
+    availability_status.short_description = 'Availability'
 
 
 @admin.register(PasswordReset)

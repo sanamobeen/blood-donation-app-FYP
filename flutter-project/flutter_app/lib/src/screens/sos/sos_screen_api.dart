@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
+import '../../models/selected_location.dart';
+import '../location/location_picker_screen.dart';
 
 class SOSScreenApi extends StatefulWidget {
   const SOSScreenApi({super.key});
@@ -26,7 +28,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
   String _situationDescription = '';
 
   // Form controllers
-  final TextEditingController _hospitalNameController = TextEditingController();
   final TextEditingController _hospitalAddressController = TextEditingController();
   final TextEditingController _contactPhoneController = TextEditingController();
   final TextEditingController _patientNameController = TextEditingController();
@@ -34,24 +35,71 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
   late TextEditingController _situationController;
   String _selectedGender = 'female';
 
+  // Location data
+  SelectedLocation? _selectedLocation;
+
   // SOS activation
   bool _isHolding = false;
   bool _isActivated = false;
   bool _isSubmitting = false;
 
-  // Location
+  // Location for GPS purposes
   Position? _currentPosition;
+
+  bool _isLoadingProfile = true;
 
   @override
   void initState() {
     super.initState();
     _situationController = TextEditingController(text: _situationDescription);
+    _loadUserProfile();
     _getCurrentLocation();
+  }
+
+  /// Load user profile to get existing location data
+  Future<void> _loadUserProfile() async {
+    try {
+      final profileResponse = await ApiService.getProfile();
+      if (profileResponse['success'] == true) {
+        final profileData = profileResponse['data'];
+        final profile = profileData['profile'];
+
+        // Check if user has existing location data from donor profile
+        if (profile != null &&
+            profile['location_lat'] != null &&
+            profile['location_lng'] != null) {
+          final lat = double.tryParse(profile['location_lat'].toString());
+          final lng = double.tryParse(profile['location_lng'].toString());
+
+          if (lat != null && lng != null) {
+            // Use existing location as default
+            setState(() {
+              _selectedLocation = SelectedLocation(
+                locationName: profile['city'] ?? 'Your Location',
+                fullAddress: profile['address'] ?? 'Location from profile',
+                latitude: lat,
+                longitude: lng,
+              );
+              _isLoadingProfile = false;
+            });
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore error, user will need to select location manually
+      debugPrint('Error loading profile: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingProfile = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
-    _hospitalNameController.dispose();
     _hospitalAddressController.dispose();
     _contactPhoneController.dispose();
     _patientNameController.dispose();
@@ -421,20 +469,8 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
   Widget _buildHospitalInfoFields() {
     return Column(
       children: [
-        // Hospital Name
-        _buildTextField(
-          controller: _hospitalNameController,
-          hintText: 'Hospital name',
-          prefixIcon: Icons.local_hospital,
-        ),
-        const SizedBox(height: 12),
-
-        // Hospital Address
-        _buildTextField(
-          controller: _hospitalAddressController,
-          hintText: 'Hospital address',
-          prefixIcon: Icons.location_on,
-        ),
+        // Hospital Location with Autocomplete
+        _buildLocationSearchField(),
         const SizedBox(height: 12),
 
         // Contact Phone
@@ -446,6 +482,127 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
         ),
       ],
     );
+  }
+
+  Widget _buildLocationSearchField() {
+    if (_selectedLocation != null) {
+      // Show selected location with option to change (same style as blood request form)
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFEBEE),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFD62828).withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_pin,
+                  size: 20,
+                  color: Color(0xFFD62828),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _selectedLocation!.locationName,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF424242),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () {
+                    setState(() => _selectedLocation = null);
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 28),
+              child: Text(
+                _selectedLocation!.fullAddress,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF757575),
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Show "Add Location" button (same style as blood request form)
+    return InkWell(
+      onTap: _openLocationPicker,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFEBEE),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFD62828).withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.add_location_alt,
+              size: 24,
+              color: Color(0xFFD62828),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Add Location',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey.shade400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLocationPicker() async {
+    final result = await Navigator.push<SelectedLocation>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const LocationPickerScreen(),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _selectedLocation = result;
+      });
+    }
   }
 
   Widget _buildTextField({
@@ -941,11 +1098,15 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
     }
 
     // Validate required fields
-    if (_hospitalNameController.text.isEmpty ||
-        _hospitalAddressController.text.isEmpty ||
-        _contactPhoneController.text.isEmpty ||
+    if (_contactPhoneController.text.isEmpty ||
         _patientNameController.text.isEmpty) {
       _showErrorDialog('Please fill in all required fields');
+      return;
+    }
+
+    // Validate location is selected
+    if (_selectedLocation == null) {
+      _showErrorDialog('Please select a location');
       return;
     }
 
@@ -955,21 +1116,18 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
 
     try {
       // Send blood group string directly (backend expects "O+", "A+", etc., not integer IDs)
+      // Use location name as hospital name since hospital name field is removed
       final result = await ApiService.createSosRequest(
         bloodType: _selectedBloodGroup!,
-        hospitalName: _hospitalNameController.text,
-        hospitalAddress: _hospitalNameController.text,
+        hospitalName: _selectedLocation!.locationName,
+        hospitalAddress: _selectedLocation!.fullAddress,
         contactPhone: _contactPhoneController.text,
         patientName: _patientNameController.text,
         age: int.tryParse(_ageController.text) ?? 35,
         gender: _selectedGender,
         unitsNeeded: _unitsNeeded,
-        hospitalLat: _currentPosition != null
-            ? double.parse(_currentPosition!.latitude.toStringAsFixed(6))
-            : null,
-        hospitalLng: _currentPosition != null
-            ? double.parse(_currentPosition!.longitude.toStringAsFixed(6))
-            : null,
+        hospitalLat: _selectedLocation!.latitude,
+        hospitalLng: _selectedLocation!.longitude,
       );
 
       setState(() {
