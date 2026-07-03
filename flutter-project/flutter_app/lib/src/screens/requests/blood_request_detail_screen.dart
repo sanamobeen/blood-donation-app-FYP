@@ -1202,7 +1202,7 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
                 currentUserId: _currentUserId,
                 isRequestCreator: _isRequestCreator(),
                 isCompleting: _isCompletingDonation,
-                onComplete: _isRequestCreator() && (pledge.status == 'pledged' || pledge.status == 'accepted')
+                onComplete: _isRequestCreator() && pledge.isAccepted
                     ? () => _completeDonation(pledge)
                     : null,
               )),

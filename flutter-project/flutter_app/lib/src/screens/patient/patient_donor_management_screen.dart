@@ -430,9 +430,10 @@ class _PatientDonorManagementScreenState extends State<PatientDonorManagementScr
 
   Widget _buildPledgeCard(DonorPledge pledge) {
     final isSelected = _selectedPledgeIds.contains(pledge.id);
-    final canAccept = pledge.status == 'pledged' || pledge.status == 'pending';
-    final canReject = pledge.status == 'pledged' || pledge.status == 'pending' || pledge.status == 'accepted';
-    final canComplete = pledge.status == 'pledged' || pledge.status == 'accepted' || pledge.status == 'confirmed';
+    // Use mapped frontend statuses from the DonorPledge model
+    final canAccept = pledge.isPending;
+    final canReject = pledge.isPending || pledge.isAccepted;
+    final canComplete = pledge.isAccepted; // Accepted pledges can be marked as donated
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
