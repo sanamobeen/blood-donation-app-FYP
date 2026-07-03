@@ -186,8 +186,8 @@ class PledgedDonorCard extends StatelessWidget {
                 ),
               ],
 
-              // Cancel button (donor only, for pledged status - NOT shown to patients)
-              if (!isRequestCreator && pledge.status == 'pledged' && onCancel != null) ...[
+              // Cancel button (donor only, for pending status - NOT shown to patients)
+              if (!isRequestCreator && pledge.isPending && onCancel != null) ...[
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextButton.icon(

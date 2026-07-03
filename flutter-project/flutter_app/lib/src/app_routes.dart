@@ -22,7 +22,6 @@ import 'screens/quiz/health_eligibility_quiz_screen.dart';
 import 'screens/donors/donor_profile_screen.dart';
 import 'screens/map/unified_map_screen.dart';
 import 'screens/patient/nearby_donors_map_screen.dart';
-import 'screens/patient/all_responding_donors_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/profile/edit_profile_screen.dart';
 import 'screens/requests/my_requests_screen.dart';
@@ -79,7 +78,6 @@ class AppRoutes {
   static const legalTerms = '/legal-terms';
   static const medicalInfo = '/medical-info';
   static const roleSwitch = '/role-switch';
-  static const allRespondingDonors = '/all-responding-donors';
   static const adminDashboard = '/admin/dashboard';
   static const adminUsers = '/admin/users';
   static const adminUserDetail = '/admin/user-detail';
@@ -133,7 +131,6 @@ class AppRoutes {
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       return RoleSwitchScreen(currentRole: args?['currentRole'] ?? 'patient');
     },
-    allRespondingDonors: (context) => const AllRespondingDonorsScreen(),
     adminDashboard: (context) => const AdminDashboardScreen(),
   };
 }

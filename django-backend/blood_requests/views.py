@@ -1640,6 +1640,14 @@ def accept_pledge(request, request_id, pledge_id):
                 blood_request.save(update_fields=['responders_count'])
             logger.info("Step 7 DONE: Blood request updated")
 
+            # Mark blood request as fulfilled when ANY pledge is accepted (patient confirmed the donor)
+            # This moves the request from "active" to "completed" section in patient's view
+            logger.info("Step 8: Marking request as fulfilled after accepting pledge")
+            blood_request.status = 'fulfilled'
+            blood_request.is_active = False
+            blood_request.save(update_fields=['status', 'is_active'])
+            logger.info(f"Request {blood_request.id} marked as fulfilled and moved to completed section")
+
             logger.info(f"SUCCESS: Pledge {pledge_id} confirmed by {request.user.email}")
 
             # AUTO-CREATE OR UPDATE CONVERSATION
@@ -1964,6 +1972,18 @@ def accept_pledges_batch(request, request_id):
             blood_request.save(update_fields=['active_donor_pledge_id', 'responders_count'])
         else:
             blood_request.save(update_fields=['responders_count'])
+
+        # Check if all required pledges are confirmed and update request status
+        blood_request.refresh_from_db()
+        confirmed_count = blood_request.responses.filter(status='confirmed').count()
+        logger.info(f"After batch accept: Confirmed pledges: {confirmed_count}, Units needed: {blood_request.units_needed}")
+
+        # Mark blood request as fulfilled when ANY pledge is accepted
+        # This moves the request from "active" to "completed" section in patient's view
+        blood_request.status = 'fulfilled'
+        blood_request.is_active = False
+        blood_request.save(update_fields=['status', 'is_active'])
+        logger.info(f"Request {blood_request.id} marked as fulfilled and moved to completed section")
 
         logger.info(f"Batch accepted {len(accepted_pledges)} pledges by {request.user.email}")
 
@@ -3062,13 +3082,13 @@ def get_responding_donors_for_patient(request):
                         'city': None,
                     },
                     'pledge': {
-                        'units_pledged': pledge.units_pledged,  # Blood pint
+                        'units_pledged': pledge.units_pledged,
                         'note': donor_note,
                         'status': pledge.status,
                         'status_display': pledge.get_status_display(),
-                        'created_at': pledge.created_at.isoformat(),  # Pledge date and time
+                        'created_at': pledge.created_at.isoformat(),
                         'is_confirmed': pledge.status == 'confirmed',
-                        'can_accept': pledge.status in ['pledged', 'shortlisted'] and pre_calculated_confirmed < blood_request.units_needed,
+                        'can_accept': pledge.status in ['pledged', 'shortlisted'],
                         'can_reject': pledge.status in ['pledged', 'shortlisted', 'confirmed'],
                         'can_complete': pledge.status in ['arrived', 'ready'],
                     }
@@ -3114,7 +3134,7 @@ def get_responding_donors_for_patient(request):
                     'status_display': pledge.get_status_display(),
                     'created_at': pledge.created_at.isoformat(),
                     'is_confirmed': pledge.status == 'confirmed',
-                    'can_accept': pledge.status in ['pledged', 'shortlisted'] and pre_calculated_confirmed < blood_request.units_needed,
+                    'can_accept': pledge.status in ['pledged', 'shortlisted'],
                     'can_reject': pledge.status in ['pledged', 'shortlisted', 'confirmed'],
                     'can_complete': pledge.status in ['arrived', 'ready'],
                 }

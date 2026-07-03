@@ -393,8 +393,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
       if (mounted) {
         if (response['success'] == true) {
-          // Refresh the responding donors list
+          // Refresh the responding donors list and blood requests
           await _loadRespondingDonors();
+          await _loadData();
 
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1150,7 +1151,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               if (_totalDonorsCount > 0)
                 TextButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.allRespondingDonors);
+                    Navigator.pushNamed(context, AppRoutes.myRequests);
                   },
                   child: const Text('View all'),
                 ),
@@ -1318,10 +1319,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: pledge['status'] == 'confirmed'
+            // Handle all "accepted" statuses (confirmed, on_the_way, arrived, ready)
+            color: ['confirmed', 'on_the_way', 'arrived', 'ready'].contains(pledge['status'])
                 ? Colors.green.withOpacity(0.3)
                 : AppColors.border,
-            width: pledge['status'] == 'confirmed' ? 2 : 1,
+            width: ['confirmed', 'on_the_way', 'arrived', 'ready'].contains(pledge['status']) ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
