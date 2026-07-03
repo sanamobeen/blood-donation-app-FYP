@@ -355,7 +355,7 @@ def get_eligibility_status(request):
             }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        logger.error(f"Error fetching eligibility status: {str(e)}")
+        logger.error(f"Error fetching eligibility status: {str(e)}", exc_info=True)
         return Response({
             'success': False,
             'message': 'Failed to fetch eligibility status'

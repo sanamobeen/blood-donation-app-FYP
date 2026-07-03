@@ -99,8 +99,8 @@ class _LifeDropAppState extends State<LifeDropApp> {
     // Handle blood request detail route: /blood-request-detail/{id}
     if (settings.name?.startsWith('/blood-request-detail/') == true) {
       final parts = settings.name?.split('/') ?? [];
-      if (parts.length >= 4) {
-        final requestId = parts[3];
+      if (parts.length >= 3) {
+        final requestId = parts[2];
         if (requestId.isNotEmpty) {
           return MaterialPageRoute(
             builder: (context) => BloodRequestDetailScreen(requestId: requestId),

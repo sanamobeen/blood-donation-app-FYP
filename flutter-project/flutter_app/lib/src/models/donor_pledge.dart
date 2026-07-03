@@ -1,3 +1,6 @@
+import 'package:flutter/material.dart';
+import '../utils/string_extensions.dart';
+
 /// Donor Pledge Model
 /// Represents a donor's pledge/commitment to donate blood for a request
 class DonorPledge {
@@ -57,6 +60,10 @@ class DonorPledge {
 
   /// Create DonorPledge from JSON
   factory DonorPledge.fromJson(Map<String, dynamic> json) {
+    // Map backend status to frontend status
+    String backendStatus = json['status']?.toString() ?? 'pending';
+    String frontendStatus = _mapBackendStatusToFrontend(backendStatus);
+
     return DonorPledge(
       id: json['id']?.toString() ?? '',
       bloodRequest: json['blood_request']?.toString() ?? '',
@@ -77,7 +84,7 @@ class DonorPledge {
       unitsPledged: json['units_pledged'] as int? ?? 1,
       unitsReceived: json['units_received'] as int? ?? 0,
       note: json['note']?.toString(),
-      status: json['status']?.toString() ?? 'pending',
+      status: frontendStatus,
       statusDisplay: json['status_display']?.toString(),
       acceptedAt: json['accepted_at'] != null
           ? DateTime.parse(json['accepted_at'])
@@ -94,6 +101,34 @@ class DonorPledge {
           : null,
       daysWaiting: json['days_waiting'] as int?,
     );
+  }
+
+  /// Map backend status to frontend status
+  static String _mapBackendStatusToFrontend(String backendStatus) {
+    switch (backendStatus) {
+      case 'pledged':
+        return 'pending';
+      case 'shortlisted':
+        return 'pending';
+      case 'confirmed':
+        return 'accepted';
+      case 'on_the_way':
+        return 'accepted';
+      case 'arrived':
+        return 'accepted';
+      case 'ready':
+        return 'accepted';
+      case 'completed':
+        return 'donated';
+      case 'rejected':
+        return 'rejected';
+      case 'cancelled':
+        return 'cancelled';
+      case 'no_show':
+        return 'cancelled';
+      default:
+        return 'pending';
+    }
   }
 
   /// Convert DonorPledge to JSON
@@ -130,52 +165,74 @@ class DonorPledge {
   }
 
   String _getStatusDisplay(String s) {
+    // Handle both backend statuses (if not mapped) and frontend statuses
     switch (s) {
       case 'pending':
+      case 'pledged':
+      case 'shortlisted':
         return 'Pending Approval';
       case 'accepted':
+      case 'confirmed':
+      case 'on_the_way':
+      case 'arrived':
+      case 'ready':
         return 'Accepted';
       case 'rejected':
         return 'Not Selected';
       case 'donated':
+      case 'completed':
         return 'Donated';
       case 'cancelled':
+      case 'no_show':
         return 'Cancelled';
       default:
-        return s;
+        // Try to capitalize the status
+        return s.split('_').map((word) => word.capitalize()).join(' ');
     }
   }
 
   /// Check if pledge is active
-  bool get isActive => status == 'pending' || status == 'accepted' || status == 'donated';
+  bool get isActive => status == 'pending' || status == 'accepted' || status == 'donated' ||
+                       status == 'pledged' || status == 'shortlisted' || status == 'confirmed' ||
+                       status == 'on_the_way' || status == 'arrived' || status == 'ready' ||
+                       status == 'completed';
 
   /// Check if pledge is pending
-  bool get isPending => status == 'pending';
+  bool get isPending => status == 'pending' || status == 'pledged' || status == 'shortlisted';
 
   /// Check if pledge is accepted
-  bool get isAccepted => status == 'accepted';
+  bool get isAccepted => status == 'accepted' || status == 'confirmed' ||
+                         status == 'on_the_way' || status == 'arrived' || status == 'ready';
 
   /// Check if pledge is rejected
   bool get isRejected => status == 'rejected';
 
   /// Check if pledge is donated
-  bool get isDonated => status == 'donated';
+  bool get isDonated => status == 'donated' || status == 'completed';
 
   /// Check if pledge can be cancelled by donor
-  bool get canBeCancelledByDonor => status == 'pending';
+  bool get canBeCancelledByDonor => status == 'pending' || status == 'pledged' || status == 'shortlisted';
 
   /// Get status color for UI
   String getStatusColor() {
     switch (status) {
       case 'pending':
+      case 'pledged':
+      case 'shortlisted':
         return '#FFA726'; // Orange
       case 'accepted':
+      case 'confirmed':
+      case 'on_the_way':
+      case 'arrived':
+      case 'ready':
         return '#66BB6A'; // Green
       case 'rejected':
         return '#EF5350'; // Red
       case 'donated':
+      case 'completed':
         return '#42A5F5'; // Blue
       case 'cancelled':
+      case 'no_show':
         return '#9E9E9E'; // Grey
       default:
         return '#9E9E9E';

@@ -1585,15 +1585,18 @@ def accept_pledge(request, request_id, pledge_id):
                 )
             logger.info("Step 2 DONE: Authorized")
 
-            # Check if there's already an active donor
-            logger.info("Step 3: Checking for active donor")
-            if blood_request.active_donor_pledge_id:
-                logger.warning(f"Active donor already exists: {blood_request.active_donor_pledge_id}")
+            # Check if there's capacity for more pledges (multi-unit support)
+            logger.info("Step 3: Checking capacity for more pledges")
+            confirmed_count = blood_request.responses.filter(status='confirmed').count()
+            logger.info(f"Currently confirmed pledges: {confirmed_count}, Units needed: {blood_request.units_needed}")
+
+            if confirmed_count >= blood_request.units_needed:
+                logger.warning(f"All {blood_request.units_needed} pledges already confirmed")
                 return error_response(
-                    'This request already has an active donor.',
+                    f'All {blood_request.units_needed} required pledge(s) have already been confirmed.',
                     status_code=status.HTTP_409_CONFLICT
                 )
-            logger.info("Step 3 DONE: No active donor")
+            logger.info("Step 3 DONE: Capacity available for more pledges")
 
             # Check if pledge can be accepted
             logger.info("Step 4: Checking pledge status")
@@ -1626,12 +1629,24 @@ def accept_pledge(request, request_id, pledge_id):
             pledge.save()
             logger.info("Step 6 DONE: Pledge updated")
 
-            # Set as active donor on blood request
+            # Set as active donor on blood request (only for first confirmed pledge)
             logger.info("Step 7: Setting active donor on blood request")
-            blood_request.active_donor_pledge_id = pledge.id
             blood_request.responders_count = F('responders_count') + 1
-            blood_request.save(update_fields=['active_donor_pledge_id', 'responders_count'])
+            # Only set active_donor_pledge_id if not already set (first confirmed pledge)
+            if not blood_request.active_donor_pledge_id:
+                blood_request.active_donor_pledge_id = pledge.id
+                blood_request.save(update_fields=['active_donor_pledge_id', 'responders_count'])
+            else:
+                blood_request.save(update_fields=['responders_count'])
             logger.info("Step 7 DONE: Blood request updated")
+
+            # Mark blood request as fulfilled when ANY pledge is accepted (patient confirmed the donor)
+            # This moves the request from "active" to "completed" section in patient's view
+            logger.info("Step 8: Marking request as fulfilled after accepting pledge")
+            blood_request.status = 'fulfilled'
+            blood_request.is_active = False
+            blood_request.save(update_fields=['status', 'is_active'])
+            logger.info(f"Request {blood_request.id} marked as fulfilled and moved to completed section")
 
             logger.info(f"SUCCESS: Pledge {pledge_id} confirmed by {request.user.email}")
 
@@ -1908,17 +1923,27 @@ def accept_pledges_batch(request, request_id):
         pledge_ids = serializer.validated_data['pledge_ids']
         patient_note = serializer.validated_data.get('patient_note', '')
 
-        # Get pledges that are pending
+        # Check capacity - count existing confirmed pledges
+        confirmed_count = blood_request.responses.filter(status='confirmed').count()
+        slots_available = blood_request.units_needed - confirmed_count
+
+        if len(pledge_ids) > slots_available:
+            return error_response(
+                f'Only {slots_available} more pledge(s) can be accepted (need {blood_request.units_needed} total, {confirmed_count} already confirmed).',
+                status_code=status.HTTP_409_CONFLICT
+            )
+
+        # Get pledges that can be accepted (pledged or shortlisted)
         pledges = DonorResponse.objects.filter(
             id__in=pledge_ids,
             blood_request=blood_request,
-            status='pending'
+            status__in=['pledged', 'shortlisted']
         )
 
         accepted_pledges = []
         for pledge in pledges:
-            pledge.status = 'accepted'
-            pledge.accepted_at = timezone.now()
+            pledge.status = 'confirmed'
+            pledge.confirmed_at = timezone.now()
             if patient_note:
                 pledge.patient_note = patient_note
             pledge.save()
@@ -1938,6 +1963,27 @@ def accept_pledges_batch(request, request_id):
                     )
                 except Exception as e:
                     logger.warning(f"Failed to create notification: {e}")
+
+        # Update blood request responders count and active donor
+        blood_request.responders_count = F('responders_count') + len(accepted_pledges)
+        # Only set active_donor_pledge_id if not already set (first confirmed pledge)
+        if not blood_request.active_donor_pledge_id and accepted_pledges:
+            blood_request.active_donor_pledge_id = accepted_pledges[0].id
+            blood_request.save(update_fields=['active_donor_pledge_id', 'responders_count'])
+        else:
+            blood_request.save(update_fields=['responders_count'])
+
+        # Check if all required pledges are confirmed and update request status
+        blood_request.refresh_from_db()
+        confirmed_count = blood_request.responses.filter(status='confirmed').count()
+        logger.info(f"After batch accept: Confirmed pledges: {confirmed_count}, Units needed: {blood_request.units_needed}")
+
+        # Mark blood request as fulfilled when ANY pledge is accepted
+        # This moves the request from "active" to "completed" section in patient's view
+        blood_request.status = 'fulfilled'
+        blood_request.is_active = False
+        blood_request.save(update_fields=['status', 'is_active'])
+        logger.info(f"Request {blood_request.id} marked as fulfilled and moved to completed section")
 
         logger.info(f"Batch accepted {len(accepted_pledges)} pledges by {request.user.email}")
 
@@ -2978,6 +3024,9 @@ def get_responding_donors_for_patient(request):
         on_the_way_count = 0
         completed_count = 0
 
+        # Pre-calculate confirmed count for capacity checking
+        pre_calculated_confirmed = pledges.filter(status='confirmed').count()
+
         for pledge in pledges:
             # Skip cancelled or rejected pledges
             if pledge.status in ['cancelled', 'rejected']:
@@ -3033,11 +3082,11 @@ def get_responding_donors_for_patient(request):
                         'city': None,
                     },
                     'pledge': {
-                        'units_pledged': pledge.units_pledged,  # Blood pint
+                        'units_pledged': pledge.units_pledged,
                         'note': donor_note,
                         'status': pledge.status,
                         'status_display': pledge.get_status_display(),
-                        'created_at': pledge.created_at.isoformat(),  # Pledge date and time
+                        'created_at': pledge.created_at.isoformat(),
                         'is_confirmed': pledge.status == 'confirmed',
                         'can_accept': pledge.status in ['pledged', 'shortlisted'],
                         'can_reject': pledge.status in ['pledged', 'shortlisted', 'confirmed'],
@@ -3572,11 +3621,17 @@ def public_request_progress_api(request, share_id):
     Used for AJAX polling/real-time updates on public page.
     """
     try:
-        blood_request = get_object_or_404(
-            BloodRequest,
+        blood_request = BloodRequest.objects.filter(
             share_id=share_id,
             is_active=True
-        )
+        ).first()
+
+        if not blood_request:
+            return Response({
+                'success': False,
+                'error': 'Blood request not found or expired',
+                'error_code': 'REQUEST_NOT_FOUND'
+            }, status=status.HTTP_404_NOT_FOUND)
 
         progress_percent = 0
         if blood_request.units_needed > 0:
