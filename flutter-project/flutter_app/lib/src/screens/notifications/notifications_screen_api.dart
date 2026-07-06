@@ -439,7 +439,11 @@ class _NotificationsScreenApiState extends State<NotificationsScreenApi> {
       case 'sos_alert':
         final sosId = data?['sos_id'] as String?;
         if (sosId != null) {
-          Navigator.pushNamed(context, '/sos-detail/$sosId');
+          Navigator.pushNamed(
+            context,
+            AppRoutes.sosDetail,
+            arguments: {'sosId': sosId},
+          );
         }
         break;
       default:
@@ -594,6 +598,7 @@ class _NotificationCard extends StatelessWidget {
   final String timestamp;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback? onAccept; // New callback for Accept action
 
   const _NotificationCard({
     required this.notification,
@@ -602,12 +607,15 @@ class _NotificationCard extends StatelessWidget {
     required this.timestamp,
     required this.onTap,
     required this.onLongPress,
+    this.onAccept,
   });
 
   @override
   Widget build(BuildContext context) {
     final isRead = notification['is_read'] as bool? ?? false;
     final message = notification['message'] as String? ?? '';
+    final type = notification['type'] as String?;
+    final hasAcceptButton = type == 'sos_response' && onAccept != null;
 
     return GestureDetector(
       onTap: onTap,
@@ -669,7 +677,7 @@ class _NotificationCard extends StatelessWidget {
                       fontWeight: isRead ? FontWeight.w400 : FontWeight.w500,
                       color: AppColors.textSecondary,
                     ),
-                    maxLines: 2,
+                    maxLines: hasAcceptButton ? 2 : 3,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -678,31 +686,49 @@ class _NotificationCard extends StatelessWidget {
 
             const SizedBox(width: 8),
 
-            // Timestamp and unread indicator
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  timestamp,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w400,
-                    color: AppColors.textSecondary,
+            // Action button or timestamp
+            if (hasAcceptButton)
+              ElevatedButton(
+                onPressed: onAccept,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: const Size(60, 36),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                if (!isRead) ...[
-                  const SizedBox(height: 4),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
+                child: const Text(
+                  'Accept',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    timestamp,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textSecondary,
                     ),
                   ),
+                  if (!isRead) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
+              ),
           ],
         ),
       ),

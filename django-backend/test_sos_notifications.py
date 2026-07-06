@@ -1,6 +1,6 @@
 """
 Test script for SOS notification functions.
-Run with: python manage.py shell < test_notifications.py
+Run with: python manage.py shell < test_sos_notifications.py
 """
 import os
 import django
@@ -12,9 +12,9 @@ from django.utils import timezone
 from sos.models import SOSRequest, SOSResponse
 from account.models import CustomUser
 
-print("=" * 60)
-print("SOS Notification Testing Script")
-print("=" * 60)
+print("=" * 70)
+print("🔔 SOS Notification Testing Script")
+print("=" * 70)
 
 # Get test users
 patient = CustomUser.objects.filter(role='patient').first()
@@ -22,11 +22,16 @@ donor = CustomUser.objects.filter(role='donor').first()
 
 if not patient or not donor:
     print("❌ ERROR: Need at least one patient and one donor in the database")
-    print("Create them first using Django admin or shell")
+    print("Create them first using Django admin or createsuperuser")
     exit(1)
 
 print(f"\n👤 Patient: {patient.email}")
 print(f"👤 Donor: {donor.email}")
+
+# Cleanup any existing test data
+print("\n🧹 Cleaning up old test data...")
+SOSRequest.objects.filter(hospital_name__icontains='Test Hospital').delete()
+print("✅ Old test data cleaned up")
 
 # Create test SOS request
 sos = SOSRequest.objects.create(
@@ -44,6 +49,7 @@ sos = SOSRequest.objects.create(
 )
 print(f"\n✅ Step 1: SOS Request created")
 print(f"   ID: {sos.id}")
+print(f"   Blood Type: {sos.blood_type}")
 print(f"   Status: {sos.status}")
 
 # Create donor response
@@ -67,8 +73,9 @@ response.save()
 
 try:
     from notifications.services.fcm_service import notify_donor_sos_accepted
-    notify_donor_sos_accepted(response)
+    result = notify_donor_sos_accepted(response)
     print("✅ Acceptance notification sent to donor")
+    print(f"   Result: {result}")
 except Exception as e:
     print(f"❌ Error: {e}")
 
@@ -76,8 +83,9 @@ except Exception as e:
 print(f"\n📧 Test 2: Donor updates ETA (notifies patient)...")
 try:
     from notifications.services.fcm_service import notify_patient_eta_update
-    notify_patient_eta_update(response, 15)
+    result = notify_patient_eta_update(response, 15)
     print("✅ ETA update notification sent to patient")
+    print(f"   Result: {result}")
 except Exception as e:
     print(f"❌ Error: {e}")
 
@@ -85,8 +93,9 @@ except Exception as e:
 print(f"\n📧 Test 3: Donor running late (notifies patient)...")
 try:
     from notifications.services.fcm_service import notify_patient_donor_running_late
-    notify_patient_donor_running_late(response, 20, 10)
+    result = notify_patient_donor_running_late(response, 20, 10)
     print("✅ Running late notification sent to patient")
+    print(f"   Result: {result}")
 except Exception as e:
     print(f"❌ Error: {e}")
 
@@ -94,8 +103,9 @@ except Exception as e:
 print(f"\n📧 Test 4: Donor confirms arrival (notifies patient)...")
 try:
     from notifications.services.fcm_service import notify_patient_donor_arrived
-    notify_patient_donor_arrived(response)
+    result = notify_patient_donor_arrived(response)
     print("✅ Arrival notification sent to patient")
+    print(f"   Result: {result}")
 except Exception as e:
     print(f"❌ Error: {e}")
 
@@ -107,8 +117,9 @@ response.save()
 
 try:
     from notifications.services.fcm_service import notify_donor_donation_confirmed
-    notify_donor_donation_confirmed(response)
+    result = notify_donor_donation_confirmed(response)
     print("✅ Donation confirmation notification sent to donor")
+    print(f"   Result: {result}")
 except Exception as e:
     print(f"❌ Error: {e}")
 
@@ -124,8 +135,9 @@ response2 = SOSResponse.objects.create(
 
 try:
     from notifications.services.fcm_service import notify_donor_response_rejected
-    notify_donor_response_rejected(response2)
+    result = notify_donor_response_rejected(response2)
     print("✅ Rejection notification sent to donor")
+    print(f"   Result: {result}")
 except Exception as e:
     print(f"❌ Error: {e}")
 
@@ -136,17 +148,17 @@ notifications = Notification.objects.filter(
     related_request_id=str(sos.id)
 ).order_by('-created_at')
 
-for notif in notifications:
+print(f"\nTotal notifications: {notifications.count()}")
+for notif in notifications[:10]:  # Show last 10
     print(f"\n  • To: {notif.user.email}")
     print(f"    Title: {notif.title}")
     print(f"    Type: {notif.type}")
-    print(f"    Message: {notif.message}")
+    print(f"    Created: {notif.created_at}")
 
-print(f"\n{'=' * 60}")
-print(f"Testing Complete!")
-print(f"Total notifications created: {notifications.count()}")
-print(f"{'=' * 60}")
+print(f"\n{'=' * 70}")
+print(f"✅ Testing Complete!")
+print(f"{'=' * 70}")
 
-# Optional: Cleanup
-print(f"\n💡 Cleanup: Delete test data? (sos.id = {sos.id})")
-print(f"   Run: SOSRequest.objects.filter(id='{sos.id}').delete()")
+# Cleanup option
+print(f"\n💡 Cleanup commands:")
+print(f"   Delete test SOS: SOSRequest.objects.filter(id='{sos.id}').delete()")

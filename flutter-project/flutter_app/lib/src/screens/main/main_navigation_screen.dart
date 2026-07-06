@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/role_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/firebase_chat_service.dart';
+import '../../services/notification_service.dart';
 import '../../models/profile.dart';
 import '../../models/blood_request.dart';
 import '../../widgets/bottom_navigation_bar.dart';
@@ -82,6 +83,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (!isAuthenticated && mounted) {
       Navigator.pushReplacementNamed(context, AppRoutes.login);
       return;
+    }
+
+    // Initialize push notifications
+    try {
+      await NotificationService().initialize();
+      debugPrint('NotificationService initialized successfully');
+    } catch (e) {
+      debugPrint('Failed to initialize NotificationService: $e');
     }
 
     // Load role if not already loaded
@@ -2030,6 +2039,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             title: 'SOS',
             icon: Icons.sos,
             onTap: () => Navigator.pushNamed(context, AppRoutes.sos),
+          ),
+          const SizedBox(width: 12),
+          _QuickActionButton(
+            title: 'SOS Active',
+            icon: Icons.notifications_active,
+            onTap: () => Navigator.pushNamed(context, AppRoutes.sosActive),
           ),
         ],
       ),

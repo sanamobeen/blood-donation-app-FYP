@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_theme.dart';
 import '../../app_routes.dart';
+import '../../services/api_service.dart';
 
 /// Notification Detail Screen
 /// Shows full details of a single notification with professional UI
@@ -24,6 +25,9 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
   late Animation<double> _slideAnimation;
   bool _isRead = false;
   bool _isDeleting = false;
+  bool _isProcessing = false; // For accept/reject actions
+  String? _sosIdToNavigate; // Store SOS ID for navigation
+  String? _responseId; // Store response ID for accept/reject
 
   @override
   void initState() {
@@ -69,6 +73,14 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
         return Icons.chat_bubble_rounded;
       case 'sos_alert':
         return Icons.emergency_rounded;
+      case 'sos_response':
+        return Icons.volunteer_activism_rounded;
+      case 'sos_response_accepted':
+        return Icons.check_circle_rounded;
+      case 'sos_response_rejected':
+        return Icons.info_outline_rounded;
+      case 'donor_on_my_way':
+        return Icons.directions_car_rounded;
       case 'external_pledge':
       case 'new_pledge':
         return Icons.volunteer_activism_rounded;
@@ -86,10 +98,16 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
       case 'external_pledge':
       case 'new_pledge':
       case 'pledge_confirmed':
+      case 'sos_response':
         return const Color(0xFFD62828);
+      case 'sos_response_accepted':
       case 'donation_completed':
       case 'thank_you':
         return const Color(0xFF2B9348);
+      case 'sos_response_rejected':
+        return Colors.grey;
+      case 'donor_on_my_way':
+        return const Color(0xFF2196F3);
       case 'blood_request_match':
         return const Color(0xFFE85D04);
       case 'message_received':
@@ -117,6 +135,14 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
         return 'New Message';
       case 'sos_alert':
         return 'SOS Alert';
+      case 'sos_response':
+        return 'SOS - Donor Response';
+      case 'sos_response_accepted':
+        return 'Response Accepted';
+      case 'sos_response_rejected':
+        return 'Response Not Selected';
+      case 'donor_on_my_way':
+        return 'Donor On The Way';
       case 'external_pledge':
         return 'Blood Pledge Received';
       case 'new_pledge':
@@ -648,7 +674,11 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
         data.containsKey('address') ||
         data.containsKey('city') ||
         data.containsKey('distance') ||
-        data.containsKey('hospital_name');
+        data.containsKey('hospital_name') ||
+        data.containsKey('responder_name') ||
+        data.containsKey('responder_email') ||
+        data.containsKey('responder_blood_type') ||
+        data.containsKey('estimated_arrival_minutes');
   }
 
   Widget _buildLocationCard(Map<String, dynamic>? data, Color color) {
@@ -669,12 +699,25 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
     final conversationId = data['conversation_id'] as String?;
     final unitsNeeded = data['units_needed'] as int?;
 
-    // Determine if this is donor info or patient info based on available data
+    // SOS responder data
+    final responderName = data['responder_name'] as String?;
+    final responderEmail = data['responder_email'] as String?;
+    final responderBloodType = data['responder_blood_type'] as String?;
+    final etaMinutes = data['estimated_arrival_minutes'] as int?;
+    final note = data['note'] as String?;
+
+    // Determine if this is SOS responder info, donor info, or patient info
+    final isSosResponder = responderName != null || responderEmail != null;
     final isPatientInfo = patientName != null || patientPhone != null;
-    final displayName = isPatientInfo ? patientName : donorName;
-    final displayPhone = isPatientInfo ? patientPhone : donorPhone;
-    final infoType = isPatientInfo ? 'Patient Information' : 'Donor Information';
-    final icon = isPatientInfo ? Icons.person_rounded : Icons.volunteer_activism_rounded;
+
+    // Use appropriate display values
+    final displayName = isSosResponder
+        ? responderName
+        : (isPatientInfo ? patientName : donorName);
+    final displayPhone = isSosResponder ? null : (isPatientInfo ? patientPhone : donorPhone);
+    final displayBloodGroup = isSosResponder ? responderBloodType : bloodGroup;
+    final infoType = isSosResponder ? 'Donor Response' : (isPatientInfo ? 'Patient Information' : 'Donor Information');
+    final icon = isSosResponder ? Icons.volunteer_activism_rounded : (isPatientInfo ? Icons.person_rounded : Icons.volunteer_activism_rounded);
 
     // Check if there's any data to display
     if (displayName == null &&
@@ -682,7 +725,9 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
         location == null &&
         hospitalName == null &&
         distance == null &&
-        bloodGroup == null) {
+        displayBloodGroup == null &&
+        etaMinutes == null &&
+        note == null) {
       return const SizedBox.shrink();
     }
 
@@ -802,6 +847,28 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
                     icon: Icons.bloodtype_rounded,
                     label: 'Blood Group',
                     value: bloodGroup,
+                    color: color,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ETA for SOS responders
+                if (etaMinutes != null) ...[
+                  _buildDetailRow(
+                    icon: Icons.access_time_rounded,
+                    label: 'Estimated Arrival',
+                    value: '$etaMinutes minutes',
+                    color: color,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Note from responder
+                if (note != null && note.isNotEmpty) ...[
+                  _buildDetailRow(
+                    icon: Icons.note_rounded,
+                    label: 'Note',
+                    value: note,
                     color: color,
                   ),
                   const SizedBox(height: 16),
@@ -990,6 +1057,184 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
   }
 
   Widget _buildActionButton(Color color, String? type, Map<String, dynamic>? data) {
+    // For SOS response notifications, show accept/reject buttons ONLY for patient
+    // Check if this notification contains responder data (meaning it's sent TO patient ABOUT a donor)
+    if (type == 'sos_response') {
+      final sosId = data?['sos_id'] as String?;
+      final responseId = data?['response_id'] as String?;
+      final responderName = data?['responder_name'] as String?;
+      final responderEmail = data?['responder_email'] as String?;
+
+      // Only show accept/decline buttons if there's responder data (for patient only)
+      // If no responder data, this might be for the donor - show NO action buttons
+      if (responderName == null && responderEmail == null) {
+        return const SizedBox.shrink();
+      }
+
+      // This is for the patient - show accept/decline buttons
+      if (sosId != null && responseId != null) {
+        _sosIdToNavigate = sosId;
+        _responseId = responseId;
+      }
+
+      return Column(
+        children: [
+          // Accept Button
+          Container(
+            width: double.infinity,
+            height: 56,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF2B9348), // Green for accept
+                  const Color(0xFF2B9348).withOpacity(0.8),
+                ],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2B9348).withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: _isProcessing ? null : () => _acceptResponder(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: _isProcessing
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Accept Donor',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Icon(Icons.check_rounded, size: 20),
+                      ],
+                    ),
+            ),
+          ),
+
+          // Reject Button
+          Container(
+            width: double.infinity,
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.grey.shade600,
+                  Colors.grey.shade700,
+                ],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: _isProcessing ? null : () => _rejectResponder(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Decline',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Icon(Icons.close_rounded, size: 20),
+                ],
+              ),
+            ),
+          ),
+
+          // View SOS Button
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: color, width: 1.5),
+            ),
+            child: OutlinedButton(
+              onPressed: () {
+                if (_sosIdToNavigate != null) {
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.sosDetail,
+                    arguments: {'sosId': _sosIdToNavigate},
+                  );
+                }
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: color,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'View All Responders',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(Icons.people_outline_rounded, size: 20, color: color),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     String buttonText;
     IconData actionIcon;
     String route;
@@ -1028,7 +1273,37 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
         buttonText = 'View SOS Alert';
         actionIcon = Icons.emergency_rounded;
         final sosId = data?['sos_id'] as String?;
-        route = sosId != null ? '/sos-detail/$sosId' : '';
+        route = sosId != null ? '_sos_special' : ''; // Special marker for SOS
+        if (sosId != null) {
+          _sosIdToNavigate = sosId;
+        }
+        break;
+      case 'sos_response_accepted':
+        buttonText = 'View Request Details';
+        actionIcon = Icons.location_on_rounded;
+        final acceptedSosId = data?['sos_id'] as String?;
+        route = acceptedSosId != null ? '_sos_special' : '';
+        if (acceptedSosId != null) {
+          _sosIdToNavigate = acceptedSosId;
+        }
+        break;
+      case 'donor_on_my_way':
+        buttonText = 'View Donor Status';
+        actionIcon = Icons.directions_car_rounded;
+        final onMyWaySosId = data?['sos_id'] as String?;
+        route = onMyWaySosId != null ? '_sos_special' : '';
+        if (onMyWaySosId != null) {
+          _sosIdToNavigate = onMyWaySosId;
+        }
+        break;
+      case 'sos_response_rejected':
+        buttonText = 'View Other Requests';
+        actionIcon = Icons.search_rounded;
+        final rejectedSosId = data?['sos_id'] as String?;
+        route = rejectedSosId != null ? '_sos_special' : '';
+        if (rejectedSosId != null) {
+          _sosIdToNavigate = rejectedSosId;
+        }
         break;
       default:
         return const SizedBox.shrink();
@@ -1059,7 +1334,16 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
       ),
       child: ElevatedButton(
         onPressed: () {
-          Navigator.pushNamed(context, route);
+          // Special handling for SOS alerts with arguments
+          if (route == '_sos_special' && _sosIdToNavigate != null) {
+            Navigator.pushNamed(
+              context,
+              AppRoutes.sosDetail,
+              arguments: {'sosId': _sosIdToNavigate},
+            );
+          } else if (route.isNotEmpty) {
+            Navigator.pushNamed(context, route);
+          }
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
@@ -1096,6 +1380,159 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen>
         type == 'new_pledge' ||
         type == 'pledge_confirmed' ||
         type == 'message_received' ||
-        type == 'sos_alert';
+        type == 'sos_alert' ||
+        type == 'sos_response' ||
+        type == 'sos_response_accepted' ||
+        type == 'donor_on_my_way';
+  }
+
+  /// Accept responder's offer
+  Future<void> _acceptResponder() async {
+    if (_sosIdToNavigate == null || _responseId == null) {
+      _showError('Missing SOS or response ID');
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final result = await ApiService.acceptSosResponse(
+        sosId: _sosIdToNavigate!,
+        responseId: _responseId!,
+      );
+
+      if (mounted) {
+        setState(() => _isProcessing = false);
+
+        if (result['success'] == true) {
+          _showSuccessDialog('Donor Accepted',
+              'The donor has been notified and is on their way to help!');
+        } else {
+          _showError(result['message'] as String? ?? 'Failed to accept donor');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showError('Network error: $e');
+      }
+    }
+  }
+
+  /// Reject responder's offer
+  Future<void> _rejectResponder() async {
+    if (_sosIdToNavigate == null || _responseId == null) {
+      _showError('Missing SOS or response ID');
+      return;
+    }
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Decline Donor?'),
+        content: const Text(
+          'Are you sure you want to decline this donor? They will be notified that you are unable to accept their offer at this time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Decline'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final result = await ApiService.rejectSosResponse(
+        sosId: _sosIdToNavigate!,
+        responseId: _responseId!,
+      );
+
+      if (mounted) {
+        setState(() => _isProcessing = false);
+
+        if (result['success'] == true) {
+          _showSuccessDialog('Donor Declined',
+              'The donor has been notified. You can view other responders.');
+        } else {
+          _showError(result['message'] as String? ?? 'Failed to decline donor');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showError('Network error: $e');
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_circle_rounded, color: Colors.green.shade600, size: 40),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context, true); // Return to notifications list with refresh
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

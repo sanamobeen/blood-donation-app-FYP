@@ -73,14 +73,32 @@ class SOSResponseSerializer(serializers.ModelSerializer):
     """
     responder_name = serializers.CharField(source='responder.full_name', read_only=True)
     responder_email = serializers.EmailField(source='responder.email', read_only=True)
+    responder_id = serializers.UUIDField(source='responder.id', read_only=True)
+    donor_lat = serializers.DecimalField(
+        source='responder.profile.lat',
+        read_only=True,
+        allow_null=True,
+        max_digits=10,
+        decimal_places=7
+    )
+    donor_lng = serializers.DecimalField(
+        source='responder.profile.lng',
+        read_only=True,
+        allow_null=True,
+        max_digits=10,
+        decimal_places=7
+    )
+    blood_group = serializers.CharField(source='responder.profile.blood_group', read_only=True)
+    profile_picture = serializers.ImageField(source='responder.profile.profile_picture', read_only=True, allow_null=True)
 
     class Meta:
         model = SOSResponse
         fields = [
-            'id', 'sos_request', 'responder', 'responder_name', 'responder_email',
-            'can_help', 'estimated_arrival_minutes', 'note', 'created_at'
+            'id', 'sos_request', 'responder', 'responder_name', 'responder_email', 'responder_id',
+            'can_help', 'estimated_arrival_minutes', 'note', 'status', 'accepted_at', 'donated_at',
+            'donor_lat', 'donor_lng', 'blood_group', 'profile_picture', 'created_at'
         ]
-        read_only_fields = ['id', 'responder', 'created_at']
+        read_only_fields = ['id', 'responder', 'created_at', 'accepted_at', 'donated_at']
 
     def create(self, validated_data):
         """Create response for the authenticated user"""

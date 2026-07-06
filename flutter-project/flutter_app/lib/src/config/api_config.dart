@@ -55,6 +55,7 @@ class ApiConfig {
   // ==================== API ENDPOINTS ====================
 
   static String get authEndpoint => '${getBaseUrl()}/api/auth';
+  static String get accountEndpoint => '${getBaseUrl()}/api/account';
   static String get bloodRequestsEndpoint => '${getBaseUrl()}/api/blood-requests';
   static String get requestsEndpoint => '${getBaseUrl()}/api/requests';
   static String get donationsEndpoint => '${getBaseUrl()}/api/donations';
