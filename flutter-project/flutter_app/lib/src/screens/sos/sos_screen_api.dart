@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../theme/app_theme.dart';
@@ -28,20 +29,19 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
   String _situationDescription = '';
 
   // Form controllers
-  final TextEditingController _hospitalAddressController = TextEditingController();
   final TextEditingController _contactPhoneController = TextEditingController();
   final TextEditingController _patientNameController = TextEditingController();
-  final TextEditingController _ageController = TextEditingController(text: '35');
-  late TextEditingController _situationController;
-  String _selectedGender = 'female';
+  final TextEditingController _ageController = TextEditingController();
+  late final TextEditingController _situationController;
+  String? _selectedGender;
 
   // Location data
   SelectedLocation? _selectedLocation;
 
   // SOS activation
-  bool _isHolding = false;
   bool _isActivated = false;
   bool _isSubmitting = false;
+  String? _createdSosId; // Store the created SOS ID
 
   // Location for GPS purposes
   Position? _currentPosition;
@@ -52,8 +52,18 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
   void initState() {
     super.initState();
     _situationController = TextEditingController(text: _situationDescription);
+
     _loadUserProfile();
     _getCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _contactPhoneController.dispose();
+    _patientNameController.dispose();
+    _ageController.dispose();
+    _situationController.dispose();
+    super.dispose();
   }
 
   /// Load user profile to get existing location data
@@ -64,7 +74,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
         final profileData = profileResponse['data'];
         final profile = profileData['profile'];
 
-        // Check if user has existing location data from donor profile
         if (profile != null &&
             profile['location_lat'] != null &&
             profile['location_lng'] != null) {
@@ -72,7 +81,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
           final lng = double.tryParse(profile['location_lng'].toString());
 
           if (lat != null && lng != null) {
-            // Use existing location as default
             setState(() {
               _selectedLocation = SelectedLocation(
                 locationName: profile['city'] ?? 'Your Location',
@@ -87,7 +95,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
         }
       }
     } catch (e) {
-      // Ignore error, user will need to select location manually
       debugPrint('Error loading profile: $e');
     } finally {
       if (mounted) {
@@ -98,45 +105,39 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
     }
   }
 
-  @override
-  void dispose() {
-    _hospitalAddressController.dispose();
-    _contactPhoneController.dispose();
-    _patientNameController.dispose();
-    _ageController.dispose();
-    _situationController.dispose();
-    super.dispose();
-  }
-
   Future<void> _getCurrentLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        return;
-      }
+      if (!serviceEnabled) return;
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return;
-        }
+        if (permission == LocationPermission.denied) return;
       }
 
       Position position = await Geolocator.getCurrentPosition();
-      setState(() {
-        _currentPosition = position;
-      });
+      if (mounted) {
+        setState(() {
+          _currentPosition = position;
+        });
+      }
     } catch (e) {
+      // Ignore location errors
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF3D0A0A),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF2D0A0A), Color(0xFF1A0505)],
+          ),
         ),
         child: SafeArea(
           child: Column(
@@ -146,20 +147,21 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
 
               // Main Content
               Expanded(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 20),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
 
-                    // Main SOS Button
-                    _buildMainSOSButton(),
+                      // Main SOS Button
+                      _buildMainSOSButton(),
 
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 32),
 
-                    // Form Card
-                    Expanded(
-                      child: _buildFormCard(),
-                    ),
-                  ],
+                      // Form Card
+                      _buildFormCard(),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -171,251 +173,315 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
         children: [
           // Back Arrow
-          GestureDetector(
-            onTap: () {
-              Navigator.pop(context);
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFEBEE),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Color(0xFFD62828),
-                size: 20,
-              ),
-            ),
+          _buildHeaderButton(
+            icon: Icons.arrow_back_ios_new_rounded,
+            onTap: () => Navigator.pop(context),
           ),
           const Expanded(
             child: Text(
               'EMERGENCY SOS',
               style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFFD62828),
-                letterSpacing: 2,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: 3,
               ),
               textAlign: TextAlign.center,
             ),
           ),
           // Info Icon
-          GestureDetector(
-            onTap: () {
-              _showSOSInfoDialog();
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFEBEE),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.info_outline_rounded,
-                color: Color(0xFFD62828),
-                size: 22,
-              ),
-            ),
+          _buildHeaderButton(
+            icon: Icons.info_outline_rounded,
+            onTap: () => _showSOSInfoDialog(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderButton({required IconData icon, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.1),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.2),
+            width: 1,
+          ),
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white,
+          size: 22,
+        ),
       ),
     );
   }
 
   Widget _buildMainSOSButton() {
-    return GestureDetector(
-      onLongPressStart: (_) {
-        setState(() {
-          _isHolding = true;
-        });
-        // Simulate activation after 2 seconds
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted && _isHolding) {
-            _activateSOS();
-          }
-        });
-      },
-      onLongPressEnd: (_) {
-        setState(() {
-          _isHolding = false;
-        });
-      },
-      child: Column(
-        children: [
-          Container(
-            width: 140,
-            height: 140,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _isSubmitting ? Colors.grey.shade600 : const Color(0xFFD62828),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF3D0A0A).withValues(alpha: 0.6),
-                  blurRadius: 30,
-                  spreadRadius: 8,
-                  offset: const Offset(0, 10),
+    return Column(
+      children: [
+        // Progress Ring
+        SizedBox(
+          width: 180,
+          height: 180,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Background circle
+              Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.05),
                 ),
-              ],
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Pulse effect when holding
-                if (_isHolding)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          width: 3,
-                        ),
-                      ),
-                    ),
-                  ),
+              ),
 
-                // SOS Text
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      _isSubmitting ? Icons.hourglass_empty : Icons.emergency_rounded,
-                      size: 40,
-                      color: Colors.white,
+              // Main SOS Button
+              InkWell(
+                onTap: _isActivated || _isSubmitting ? null : _activateSOS,
+                borderRadius: BorderRadius.circular(70),
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: _isSubmitting
+                          ? [Colors.grey.shade700, Colors.grey.shade900]
+                          : (_isActivated
+                              ? [Colors.grey.shade400, Colors.grey.shade500]
+                              : [const Color(0xFFE53935), const Color(0xFFD32F2F)]),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'SOS',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 3,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE53935).withValues(alpha: 0.4),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                        offset: const Offset(0, 15),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // SOS Icon/Text
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 50,
+                                height: 50,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 4,
+                                  key: ValueKey('loading'),
+                                ),
+                              )
+                            : _isActivated
+                                ? Container(
+                                    key: const ValueKey('activated'),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.check_rounded,
+                                      color: Color(0xFFE53935),
+                                      size: 50,
+                                    ),
+                                  )
+                                : Column(
+                                    key: const ValueKey('sos'),
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.emergency_rounded,
+                                        size: 42,
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'SOS',
+                                        style: TextStyle(
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: 4,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                      ),
+                    ],
+                  ),
                 ),
-
-                // Loading indicator when holding/submitting
-                if (_isHolding || _isSubmitting)
-                  const Positioned.fill(
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 3,
-                    ),
-                  ),
-
-                // Checkmark when activated
-                if (_isActivated && !_isHolding && !_isSubmitting)
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Color(0xFFD62828),
-                      size: 40,
-                    ),
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
+        ),
+        const SizedBox(height: 20),
+
+        // Status Text
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Text(
             _isSubmitting
                 ? 'Creating SOS request...'
                 : _isActivated
                     ? 'Emergency Broadcasted!'
-                    : 'Hold to broadcast emergency',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-              letterSpacing: 1,
+                    : '',
+            key: ValueKey(_isSubmitting ? 'submitting' : _isActivated ? 'activated' : 'idle'),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _isActivated ? Colors.green.shade400 : Colors.white,
+              letterSpacing: 1.5,
             ),
           ),
-        ],
-      ),
+        ),
+
+        // Subtitle text
+        const SizedBox(height: 8),
+        if (!_isActivated && !_isSubmitting)
+          Text(
+            'Emergency blood request to nearby donors',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.white.withValues(alpha: 0.6),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+      ],
     );
   }
 
   Widget _buildFormCard() {
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBFB),
+        color: Colors.white,
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-        border: Border.all(
-          color: const Color(0xFFD62828).withValues(alpha: 0.2),
-          width: 1,
+          topLeft: Radius.circular(32),
+          topRight: Radius.circular(32),
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFD62828).withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 40,
+            offset: const Offset(0, -10),
           ),
         ],
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+        padding: const EdgeInsets.fromLTRB(20, 32, 20, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Patient Information Section
-            _buildSectionTitle('Patient Information'),
+            // Patient Name
+            _buildSectionTitle('Patient Name*'),
             const SizedBox(height: 12),
-            _buildPatientInfoFields(),
-
+            _buildInputField(
+              controller: _patientNameController,
+              hintText: 'Enter patient name',
+            ),
             const SizedBox(height: 20),
 
-            // Hospital Information Section
-            _buildSectionTitle('Hospital Information'),
-            const SizedBox(height: 12),
-            _buildHospitalInfoFields(),
-
+            // Age and Gender Row
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionTitle('Age*'),
+                      const SizedBox(height: 12),
+                      _buildInputField(
+                        controller: _ageController,
+                        hintText: 'Age',
+                        keyboardType: TextInputType.number,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionTitle('Gender*'),
+                      const SizedBox(height: 12),
+                      _buildGenderSelector(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
 
-            // Your Blood Group
-            _buildSectionTitle('Blood Group Required'),
+            // Hospital Location
+            _buildSectionTitle('Hospital Location*'),
+            const SizedBox(height: 12),
+            _buildLocationSection(),
+            const SizedBox(height: 20),
+
+            // Contact Number
+            _buildSectionTitle('Emergency Contact*'),
+            const SizedBox(height: 12),
+            _buildPhoneField(),
+            const SizedBox(height: 20),
+
+            // Blood Group
+            _buildSectionTitle('Blood Group Required*'),
             const SizedBox(height: 12),
             _buildBloodGroupSelector(),
-
             const SizedBox(height: 20),
 
             // Units Needed
-            _buildSectionTitle('Units Needed'),
+            _buildSectionTitle('Units Needed*'),
             const SizedBox(height: 12),
             _buildUnitsSelector(),
-
             const SizedBox(height: 20),
 
-            // Alert Donors Within
+            // Alert Radius
             _buildSectionTitle('Alert Donors Within'),
             const SizedBox(height: 12),
             _buildDistanceSelector(),
-
             const SizedBox(height: 20),
 
-            // Situation Description
+            // Additional Notes
             _buildSectionTitle('Additional Notes (Optional)'),
             const SizedBox(height: 12),
-            _buildSituationDescription(),
+            _buildNotesField(),
+            const SizedBox(height: 32),
 
-            const SizedBox(height: 24),
+            // Submit Button
+            _buildSubmitButton(),
+            const SizedBox(height: 16),
 
-            // Activate Button
-            _buildActivateButton(),
+            // Disclaimer
+            Center(
+              child: Text(
+                '⚠️ Use SOS only in real medical emergencies',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
           ],
         ),
       ),
@@ -426,76 +492,284 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
     return Text(
       title,
       style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-        color: Color(0xFF424242),
-        letterSpacing: 0.5,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
       ),
     );
   }
 
-  Widget _buildPatientInfoFields() {
-    return Column(
-      children: [
-        // Patient Name
-        _buildTextField(
-          controller: _patientNameController,
-          hintText: 'Enter patient name',
-          prefixIcon: Icons.person,
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hintText,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        hintText: hintText,
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border, width: 1),
         ),
-        const SizedBox(height: 12),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.focus, width: 2),
+        ),
+      ),
+    );
+  }
 
-        // Age and Gender Row
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                controller: _ageController,
-                hintText: 'Age',
-                prefixIcon: Icons.cake,
-                keyboardType: TextInputType.number,
+  Widget _buildPhoneField() {
+    return TextField(
+      controller: _contactPhoneController,
+      keyboardType: TextInputType.phone,
+      decoration: InputDecoration(
+        hintText: '03XX-XXXXXXX',
+        helperText: 'Format: 03XXXXXXXXX (11 digits)',
+        prefixIcon: Icon(
+          Icons.phone,
+          color: AppColors.primary,
+          size: 20,
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border, width: 1),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.focus, width: 2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenderSelector() {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedGender,
+          isExpanded: true,
+          icon: Icon(
+            Icons.keyboard_arrow_down,
+            color: AppColors.primary,
+          ),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
+          hint: const Text(
+            'Select Gender',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          items: ['male', 'female', 'other'].map((String gender) {
+            return DropdownMenuItem<String>(
+              value: gender,
+              child: Text(
+                gender[0].toUpperCase() + gender.substring(1),
+              ),
+            );
+          }).toList(),
+          onChanged: (String? newValue) {
+            setState(() => _selectedGender = newValue);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBloodGroupSelector() {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedBloodGroup,
+          isExpanded: true,
+          icon: Icon(
+            Icons.keyboard_arrow_down,
+            color: AppColors.primary,
+          ),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
+          hint: const Text(
+            'Select Blood Group',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          items: _bloodGroups.map((String group) {
+            return DropdownMenuItem<String>(
+              value: group,
+              child: Text(group),
+            );
+          }).toList(),
+          onChanged: (String? newValue) {
+            setState(() => _selectedBloodGroup = newValue);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUnitsSelector() {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: () {
+            if (_unitsNeeded > 1) {
+              setState(() => _unitsNeeded--);
+            }
+          },
+          icon: const Icon(Icons.remove_circle_outline),
+          iconSize: 32,
+          color: AppColors.primary,
+        ),
+        Expanded(
+          child: Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border, width: 1),
+            ),
+            child: Center(
+              child: Text(
+                '$_unitsNeeded',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildGenderSelector(),
-            ),
-          ],
+          ),
+        ),
+        IconButton(
+          onPressed: () {
+            if (_unitsNeeded < 10) {
+              setState(() => _unitsNeeded++);
+            }
+          },
+          icon: const Icon(Icons.add_circle_outline),
+          iconSize: 32,
+          color: AppColors.primary,
         ),
       ],
     );
   }
 
-  Widget _buildHospitalInfoFields() {
+  Widget _buildDistanceSelector() {
     return Column(
       children: [
-        // Hospital Location with Autocomplete
-        _buildLocationSearchField(),
-        const SizedBox(height: 12),
-
-        // Contact Phone
-        _buildTextField(
-          controller: _contactPhoneController,
-          hintText: '03XX-XXXXXXX',
-          prefixIcon: Icons.phone,
-          keyboardType: TextInputType.phone,
+        // Distance chips row
+        Row(
+          children: _distanceOptions.map((distance) {
+            final isSelected = distance == _selectedDistance;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: distance != _distanceOptions.last ? 8 : 0,
+                ),
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedDistance = distance),
+                  child: Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? AppColors.primary : AppColors.border,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${distance.toInt()} km',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
   }
 
-  Widget _buildLocationSearchField() {
+  Widget _buildNotesField() {
+    return TextField(
+      controller: _situationController,
+      maxLines: 3,
+      decoration: InputDecoration(
+        hintText: 'Add any additional notes about the emergency...',
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border, width: 1),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.border, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.focus, width: 2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationSection() {
     if (_selectedLocation != null) {
-      // Show selected location with option to change (same style as blood request form)
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFEBEE),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFFD62828).withValues(alpha: 0.3),
-            width: 1,
-          ),
+          border: Border.all(color: AppColors.border, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -505,26 +779,24 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
                 const Icon(
                   Icons.location_pin,
                   size: 20,
-                  color: Color(0xFFD62828),
+                  color: AppColors.primary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     _selectedLocation!.locationName,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF424242),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, size: 20),
-                  onPressed: () {
-                    setState(() => _selectedLocation = null);
-                  },
+                  onPressed: () => setState(() => _selectedLocation = null),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -537,7 +809,7 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
                 _selectedLocation!.fullAddress,
                 style: const TextStyle(
                   fontSize: 13,
-                  color: Color(0xFF757575),
+                  color: AppColors.textSecondary,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -548,41 +820,37 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
       );
     }
 
-    // Show "Add Location" button (same style as blood request form)
     return InkWell(
       onTap: _openLocationPicker,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFEBEE),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFFD62828).withValues(alpha: 0.3),
-            width: 1,
-          ),
+          border: Border.all(color: AppColors.border, width: 1),
         ),
         child: Row(
           children: [
             const Icon(
               Icons.add_location_alt,
               size: 24,
-              color: Color(0xFFD62828),
+              color: AppColors.primary,
             ),
             const SizedBox(width: 12),
             Text(
-              'Add Location',
+              'Add Hospital Location',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary.withValues(alpha: 0.8),
               ),
             ),
             const Spacer(),
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: Colors.grey.shade400,
+              color: AppColors.textSecondary.withValues(alpha: 0.5),
             ),
           ],
         ),
@@ -599,491 +867,48 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
     );
 
     if (result != null) {
-      setState(() {
-        _selectedLocation = result;
-      });
+      setState(() => _selectedLocation = result);
     }
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hintText,
-    required IconData prefixIcon,
-    TextInputType? keyboardType,
-  }) {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFEBEE),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFD62828).withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            prefixIcon,
-            color: const Color(0xFFD62828),
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType: keyboardType,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                hintText: hintText,
-                hintStyle: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildSubmitButton() {
+    final isFormValid = _selectedBloodGroup != null &&
+        _selectedGender != null &&
+        _patientNameController.text.isNotEmpty &&
+        _ageController.text.isNotEmpty &&
+        _contactPhoneController.text.isNotEmpty &&
+        _selectedLocation != null;
 
-  Widget _buildGenderSelector() {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFEBEE),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFD62828).withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: DropdownButton<String>(
-        value: _selectedGender,
-        isExpanded: true,
-        icon: const Icon(
-          Icons.keyboard_arrow_down_rounded,
-          color: Color(0xFFD62828),
-        ),
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFFD62828),
-        ),
-        underline: const SizedBox.shrink(),
-        items: ['male', 'female', 'other'].map((String gender) {
-          return DropdownMenuItem<String>(
-            value: gender,
-            child: Text(gender[0].toUpperCase() + gender.substring(1)), // Display with capital first letter
-          );
-        }).toList(),
-        onChanged: (String? newValue) {
-          setState(() {
-            _selectedGender = newValue!;
-          });
-        },
-      ),
-    );
-  }
-
-  Widget _buildBloodGroupSelector() {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFEBEE),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFD62828).withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFD62828),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.bloodtype,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Blood group:',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (_selectedBloodGroup == null)
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedBloodGroup = _bloodGroups.first;
-                });
-              },
-              child: Text(
-                'Select blood group',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey.shade400,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            )
-          else
-            DropdownButton<String>(
-              value: _selectedBloodGroup,
-              icon: const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFFD62828),
-              ),
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFFD62828),
-              ),
-              underline: const SizedBox.shrink(),
-              items: _bloodGroups.map((String group) {
-                return DropdownMenuItem<String>(
-                  value: group,
-                  child: Row(
-                    children: [
-                      Text(
-                        group,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFD62828),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        group.contains('+') ? '(Positive)' : '(Negative)',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedBloodGroup = newValue!;
-                });
-              },
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUnitsSelector() {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFEBEE),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFD62828).withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            'Units needed:',
-            style: TextStyle(
-              fontSize: 13,
-              color: Color(0xFF757575),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Row(
-            children: [
-              // Minus Button
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (_unitsNeeded > 1) _unitsNeeded--;
-                  });
-                },
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD62828),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.remove,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                '$_unitsNeeded',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFD62828),
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Plus Button
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (_unitsNeeded < 10) _unitsNeeded++;
-                  });
-                },
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD62828),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.add,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDistanceSelector() {
-    return Column(
-      children: [
-        Container(
-          height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFEBEE),
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton(
+        onPressed: isFormValid && !_isSubmitting ? _activateSOS : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isFormValid ? AppColors.primary : Colors.grey.shade300,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0xFFD62828).withValues(alpha: 0.3),
-              width: 1,
-            ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Alert radius:',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF757575),
-                  fontWeight: FontWeight.w500,
+          elevation: 0,
+          disabledBackgroundColor: Colors.grey.shade300,
+        ),
+        child: _isSubmitting
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
-              ),
-              Text(
-                '${_selectedDistance.toInt()} km',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFD62828),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        // Slider
-        SliderTheme(
-          data: SliderThemeData(
-            activeTrackColor: const Color(0xFFD62828),
-            inactiveTrackColor: const Color(0xFFFFCDD2),
-            thumbColor: const Color(0xFFD62828),
-            overlayColor: const Color(0xFFD62828).withValues(alpha: 0.2),
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
-            trackHeight: 6,
-          ),
-          child: Slider(
-            value: _selectedDistance,
-            min: 5,
-            max: 50,
-            divisions: 3,
-            onChanged: (value) {
-              setState(() {
-                _selectedDistance = value;
-              });
-            },
-          ),
-        ),
-        // Distance markers
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: _distanceOptions.map((distance) {
-              final isSelected = distance == _selectedDistance;
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedDistance = distance;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFFD62828)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFFD62828),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    '${distance.toInt()} km',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white : const Color(0xFFD62828),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSituationDescription() {
-    final characterCount = _situationDescription.length;
-    final maxLength = 250;
-
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFEBEE),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0xFFD62828).withValues(alpha: 0.3),
-              width: 1,
-            ),
-          ),
-          child: TextField(
-            maxLines: 4,
-            maxLength: maxLength,
-            controller: _situationController,
-            onChanged: (value) {
-              setState(() {
-                _situationDescription = value;
-              });
-            },
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF424242),
-              height: 1.5,
-            ),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
-              isDense: true,
-              counterText: '',
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        // Character count
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Text(
-              '$characterCount/$maxLength',
+              )
+            : const Text(
+              'Activate Emergency SOS',
               style: TextStyle(
-                fontSize: 12,
-                color: characterCount > maxLength * 0.8
-                    ? const Color(0xFFD62828)
-                    : Colors.grey.shade600,
-                fontWeight: FontWeight.w500,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActivateButton() {
-    return GestureDetector(
-      onTap: () {
-        _activateSOS();
-      },
-      child: Container(
-        height: 56,
-        decoration: BoxDecoration(
-          color: _isSubmitting ? Colors.grey.shade600 : const Color(0xFFD62828),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFD62828).withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _isSubmitting ? Icons.hourglass_empty : Icons.emergency_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              _isSubmitting ? 'Creating...' : 'Activate SOS',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 1,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1091,65 +916,79 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
   void _activateSOS() async {
     if (_isActivated || _isSubmitting) return;
 
-    // Validate blood group is selected
+    // Validate blood group
     if (_selectedBloodGroup == null) {
-      _showErrorDialog('Please select a blood group first');
       return;
     }
 
     // Validate required fields
     if (_contactPhoneController.text.isEmpty ||
-        _patientNameController.text.isEmpty) {
-      _showErrorDialog('Please fill in all required fields');
+        _patientNameController.text.isEmpty ||
+        _ageController.text.isEmpty) {
       return;
     }
 
-    // Validate location is selected
+    // Validate gender
+    if (_selectedGender == null) {
+      return;
+    }
+
+    // Validate location
     if (_selectedLocation == null) {
-      _showErrorDialog('Please select a location');
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
+    // Validate age
+    final age = int.tryParse(_ageController.text);
+    if (age == null || age < 0 || age > 120) {
+      return;
+    }
+
+    // Validate phone number
+    final phone = _contactPhoneController.text.trim();
+    final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
+    if (!digits.startsWith('03') || digits.length != 11) {
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
 
     try {
-      // Send blood group string directly (backend expects "O+", "A+", etc., not integer IDs)
-      // Use location name as hospital name since hospital name field is removed
       final result = await ApiService.createSosRequest(
         bloodType: _selectedBloodGroup!,
         hospitalName: _selectedLocation!.locationName,
         hospitalAddress: _selectedLocation!.fullAddress,
-        contactPhone: _contactPhoneController.text,
+        contactPhone: phone,
         patientName: _patientNameController.text,
-        age: int.tryParse(_ageController.text) ?? 35,
-        gender: _selectedGender,
+        age: age,
+        gender: _selectedGender!,
         unitsNeeded: _unitsNeeded,
         hospitalLat: _selectedLocation!.latitude,
         hospitalLng: _selectedLocation!.longitude,
       );
 
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() => _isSubmitting = false);
 
-      if (result['success'] == true) {
-        setState(() {
-          _isActivated = true;
-        });
-        _showSOSActivatedDialog();
-      } else {
-        _showErrorDialog(result['message'] as String? ?? 'Failed to create SOS request');
+        if (result['success'] == true) {
+          // Extract SOS ID from response
+          final data = result['data'] as Map<String, dynamic>?;
+          final sosRequest = data?['sos_request'] as Map<String, dynamic>?;
+          _createdSosId = sosRequest?['id'] as String?;
+
+          setState(() => _isActivated = true);
+          _showSOSActivatedDialog();
+        } else {
+          _showError(result['message'] as String? ?? 'Failed to create SOS request');
+        }
       }
     } catch (e) {
-      setState(() {
-        _isSubmitting = false;
-      });
-      _showErrorDialog('Network error: $e');
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        _showError('Network error: $e');
+      }
     }
   }
-
 
   void _showSOSActivatedDialog() {
     showDialog(
@@ -1165,13 +1004,13 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
             Container(
               width: 80,
               height: 80,
-              decoration: const BoxDecoration(
-                color: Color(0xFF4CAF50),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.check,
-                color: Colors.white,
+                Icons.check_circle_rounded,
+                color: Colors.green,
                 size: 48,
               ),
             ),
@@ -1180,26 +1019,34 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
               'SOS Activated!',
               style: TextStyle(
                 fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF424242),
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              'Your emergency request has been broadcast to all donors within ${_selectedDistance.toInt()} km radius.',
+              'Your emergency request has been broadcast to donors within ${_selectedDistance.toInt()} km',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            Text(
-              'Blood Group: $_selectedBloodGroup | Units: $_unitsNeeded',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFFD62828),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.softPink.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Blood: $_selectedBloodGroup | Units: $_unitsNeeded',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -1216,7 +1063,7 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                         side: const BorderSide(
-                          color: Color(0xFFD62828),
+                          color: AppColors.primary,
                           width: 1,
                         ),
                       ),
@@ -1224,21 +1071,30 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
                     child: const Text(
                       'Go to Home',
                       style: TextStyle(
-                        color: Color(0xFFD62828),
+                        color: AppColors.primary,
                         fontWeight: FontWeight.w600,
+                        fontSize: 15,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      Navigator.pushReplacementNamed(context, '/sos-active');
+                      if (_createdSosId != null) {
+                        Navigator.pushReplacementNamed(
+                          context,
+                          '/sos-active',
+                          arguments: {'sosId': _createdSosId},
+                        );
+                      } else {
+                        Navigator.pushReplacementNamed(context, '/sos-active');
+                      }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD62828),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       elevation: 0,
@@ -1250,6 +1106,7 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
                       'View Responses',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
+                        fontSize: 15,
                       ),
                     ),
                   ),
@@ -1267,20 +1124,20 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
         ),
         title: Row(
           children: [
             Container(
               width: 40,
               height: 40,
-              decoration: const BoxDecoration(
-                color: Color(0xFFD62828),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.info,
-                color: Colors.white,
+                color: AppColors.primary,
                 size: 24,
               ),
             ),
@@ -1289,7 +1146,7 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
           ],
         ),
         content: const Text(
-          'The SOS feature sends an emergency blood request to all nearby donors instantly. Use this only in critical situations when blood is needed urgently.',
+          'The SOS feature sends an emergency blood request to all nearby donors instantly. This should only be used in critical situations when blood is needed urgently.',
         ),
         actions: [
           TextButton(
@@ -1297,7 +1154,7 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
             child: const Text(
               'Got it',
               style: TextStyle(
-                color: Color(0xFFD62828),
+                color: AppColors.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1307,27 +1164,15 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
     );
   }
 
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Text('Error'),
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
         content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'OK',
-              style: TextStyle(
-                color: Color(0xFFD62828),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+        backgroundColor: AppColors.urgencyCritical,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
     );
   }

@@ -23,8 +23,11 @@ class SOSRequest(models.Model):
 
     STATUS_CHOICES = [
         ('active', 'Active'),
+        ('awaiting_arrival', 'Awaiting Donor Arrival'),
+        ('in_progress', 'Donation In Progress'),
         ('resolved', 'Resolved'),
         ('cancelled', 'Cancelled'),
+        ('expired', 'Expired - No Responses'),
     ]
 
     GENDER_CHOICES = [
@@ -177,6 +180,18 @@ class SOSResponse(models.Model):
     Track donor responses to SOS requests.
     """
 
+    RESPONSE_STATUS_CHOICES = [
+        ('pending', 'Pending - Awaiting Patient Review'),
+        ('accepted', 'Accepted by Patient'),
+        ('rejected', 'Rejected by Patient'),
+        ('in_transit', 'Donor is On the Way'),
+        ('arrived', 'Donor Arrived at Hospital'),
+        ('donating', 'Donation In Progress'),
+        ('donated', 'Donation Completed'),
+        ('no_show', 'Donor Did Not Arrive'),
+        ('cancelled', 'Cancelled by Donor'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
     sos_request = models.ForeignKey(
@@ -207,6 +222,39 @@ class SOSResponse(models.Model):
         blank=True,
         null=True,
         help_text="Additional note from responder"
+    )
+
+    # Confirmation/Status tracking
+    status = models.CharField(
+        max_length=20,
+        choices=RESPONSE_STATUS_CHOICES,
+        default='pending',
+        help_text="Status of the donor response"
+    )
+    accepted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When patient accepted this donor"
+    )
+    departed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When donor departed for hospital"
+    )
+    arrived_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When donor arrived at hospital"
+    )
+    donated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When donor completed donation"
+    )
+    cancelled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When donor cancelled their response"
     )
 
     # Timestamps

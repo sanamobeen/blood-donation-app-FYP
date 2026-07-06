@@ -3,13 +3,20 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
 
 /// SOS Active Screen - Shows active emergency broadcast with live map and responders
 /// Displays real map with SOS location and nearby donors who have responded
 class SOSActiveScreen extends StatefulWidget {
-  const SOSActiveScreen({super.key});
+  /// Optional SOS ID - if provided, will load this specific SOS request
+  final String? sosId;
+
+  const SOSActiveScreen({
+    super.key,
+    this.sosId,
+  });
 
   @override
   State<SOSActiveScreen> createState() => _SOSActiveScreenState();
@@ -28,15 +35,39 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
   String? _errorMessage;
 
   // SOS data
-  Map<String, dynamic>? _sosRequest;
+  String? _sosId; // Store SOS ID for actions
   List<Map<String, dynamic>> _responders = [];
+
+  // Location
+  Position? _currentPosition;
 
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
     _startTimer();
+    _getCurrentLocation();
     _loadSOSData();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _currentPosition = position;
+      });
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+    }
   }
 
   @override
@@ -69,41 +100,50 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
     });
 
     try {
-      // Get user's active SOS requests
-      final response = await ApiService.getActiveSosRequests(
-        lat: 0, // We'll get actual location from the SOS data
-        lng: 0,
-      );
+      // If SOS ID is provided (from navigation), fetch that specific SOS
+      if (widget.sosId != null) {
+        final response = await ApiService.getSosDetail(widget.sosId!);
 
-      if (response['success'] == true && response['data'] != null) {
-        final data = response['data'];
-        final requests = data['requests'] as List? ?? [];
+        if (response['success'] == true) {
+          final data = response['data'] as Map<String, dynamic>?;
+          final sosRequest = data?['sos_request'] as Map<String, dynamic>?;
+          final responders = data?['responders'] as List?;
 
-        if (requests.isNotEmpty) {
-          // Get the most recent SOS request
-          final sosRequest = requests.first as Map<String, dynamic>;
-
-          // Parse location
-          final lat = sosRequest['hospital_lat'] as double?;
-          final lng = sosRequest['hospital_lng'] as double?;
-
-          if (lat != null && lng != null) {
-            setState(() {
-              _sosRequest = sosRequest;
-              _sosLocation = LatLng(lat, lng);
-            });
-
-            // Fetch nearby donors/responders
-            await _fetchResponders(lat, lng);
+          if (sosRequest != null) {
+            _processSOSRequest(sosRequest, responders);
           } else {
             setState(() {
-              _errorMessage = 'SOS location not available';
+              _errorMessage = 'SOS request data not available';
               _isLoading = false;
             });
           }
         } else {
           setState(() {
-            _errorMessage = 'No active SOS requests found';
+            _errorMessage = response['message'] ?? 'Failed to load SOS details';
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // Otherwise, get current user's active SOS requests
+      final response = await ApiService.getMyActiveSosRequests();
+
+      if (response['success'] == true) {
+        // FIXED: requests is directly in response, not in response['data']['requests']
+        final requests = response['requests'] as List?;
+
+        print('🔍 DEBUG: Number of requests = ${requests?.length ?? 0}');
+
+        if (requests != null && requests.isNotEmpty) {
+          // Get the most recent SOS request (created by this user)
+          final sosRequest = requests.first as Map<String, dynamic>;
+          final responders = sosRequest['responders'] as List?;
+          print('🔍 DEBUG: Responders from API = ${responders?.length ?? 0}');
+          _processSOSRequest(sosRequest, responders);
+        } else {
+          setState(() {
+            _errorMessage = 'No active SOS requests found. Create an SOS request to see responders here.';
             _isLoading = false;
           });
         }
@@ -121,40 +161,52 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
     }
   }
 
-  Future<void> _fetchResponders(double lat, double lng) async {
-    try {
-      // Fetch nearby donors
-      final response = await ApiService.getNearbyDonors(
-        lat: lat,
-        lng: lng,
-        radius: 50,
-      );
+  void _processSOSRequest(Map<String, dynamic> sosRequest, [List? responders]) {
+    // Parse location
+    final lat = _parseDouble(sosRequest['hospital_lat']);
+    final lng = _parseDouble(sosRequest['hospital_lng']);
 
-      if (response['success'] == true && response['data'] != null) {
-        final data = response['data'];
-        final donorsList = (data['donors'] as List? ?? [])
-            .cast<Map<String, dynamic>>();
+    if (lat != null && lng != null) {
+      // Load responders - use passed list or try to get from sosRequest
+      List<Map<String, dynamic>> responderList = [];
 
-        setState(() {
-          _responders = donorsList;
-          _isLoading = false;
-        });
-
-        _createMarkers();
-      } else {
-        setState(() {
-          _responders = [];
-          _isLoading = false;
-        });
-        _createMarkers();
+      if (responders != null && responders.isNotEmpty) {
+        // Convert List<dynamic> to List<Map<String, dynamic>>
+        responderList = responders
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      } else if (sosRequest['responders'] != null) {
+        // Extract from sosRequest
+        final respondersList = sosRequest['responders'] as List?;
+        if (respondersList != null && respondersList.isNotEmpty) {
+          responderList = respondersList
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
       }
-    } catch (e) {
-      print('Error fetching responders: $e');
+
       setState(() {
-        _responders = [];
+        _sosId = sosRequest['id'] as String?;
+        _sosLocation = LatLng(lat, lng);
+        _responders = responderList;
         _isLoading = false;
       });
+
+      // Debug output
+      print('🔍 DEBUG: SOS ID = $_sosId');
+      print('🔍 DEBUG: Responders count = ${responderList.length}');
+      if (responderList.isNotEmpty) {
+        for (var i = 0; i < responderList.length; i++) {
+          print('🔍 DEBUG: Responder $i = ${responderList[i]}');
+        }
+      }
+
       _createMarkers();
+    } else {
+      setState(() {
+        _errorMessage = 'SOS location not available';
+        _isLoading = false;
+      });
     }
   }
 
@@ -206,12 +258,13 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
     // Add responder markers
     for (var i = 0; i < _responders.length; i++) {
       final responder = _responders[i];
-      final lat = responder['lat'] as double?;
-      final lng = responder['lng'] as double?;
+      // Responders may or may not have location data depending on backend response
+      final lat = _parseDouble(responder['lat']) ?? _parseDouble(responder['donor_lat']);
+      final lng = _parseDouble(responder['lng']) ?? _parseDouble(responder['donor_lng']);
 
       if (lat != null && lng != null) {
         final bloodType = responder['blood_group'] as String? ?? 'Unknown';
-        final name = responder['full_name'] as String? ?? 'Donor';
+        final name = responder['responder_name'] as String? ?? responder['donor_name'] as String? ?? responder['full_name'] as String? ?? 'Donor';
 
         _markers.add(
           Marker(
@@ -564,15 +617,46 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
                     itemCount: _responders.length,
                     itemBuilder: (context, index) {
                       final responder = _responders[index];
+                      final responseId = responder['id'] as String?;
+                      final status = responder['status'] as String? ?? 'pending';
+                      final eta = _parseInt(responder['estimated_arrival_minutes']);
+
+                      // Calculate minutes past ETA
+                      final acceptedAt = _parseDateTime(responder['accepted_at']);
+                      final minutesLate = acceptedAt != null && eta != null
+                          ? (_elapsedSeconds / 60).floor() - eta
+                          : null;
+
+                      // Debug output
+                      print('🔍 Card $index: status=$status, responseId=$responseId, sosId=$_sosId');
+                      print('🔍 Card $index: onAccept=${status == 'pending' && responseId != null && _sosId != null}');
+
                       return _ResponderCard(
-                        name: responder['full_name'] as String? ?? 'Unknown',
+                        name: responder['responder_name'] as String? ?? responder['donor_name'] as String? ?? responder['full_name'] as String? ?? 'Unknown',
                         bloodType: responder['blood_group'] as String? ?? 'Unknown',
                         distance: _calculateDistance(responder),
                         image: responder['profile_picture'] as String?,
-                        isAvailable: responder['is_available_for_donation'] as bool? ?? true,
+                        isAvailable: true,
+                        eta: eta,
+                        status: status,
+                        responseId: responseId,
+                        sosId: _sosId,
+                        minutesLate: minutesLate != null ? (minutesLate > 0 ? minutesLate : null) : null,
                         onTap: () {
                           _showResponderDialog(responder);
                         },
+                        onAccept: status == 'pending' && responseId != null && _sosId != null
+                            ? () => _acceptResponder(responseId!)
+                            : null,
+                        onConfirm: status == 'accepted' && responseId != null && _sosId != null
+                            ? () => _confirmDonation(responseId!)
+                            : null,
+                        onNotifyLate: (minutesLate != null && minutesLate >= 5) && responseId != null && _sosId != null
+                            ? () => _notifyDonorLate(responseId!, minutesLate)
+                            : null,
+                        onMarkNoShow: (minutesLate != null && minutesLate >= 10) && responseId != null && _sosId != null
+                            ? () => _markNoShow(responseId!)
+                            : null,
                       );
                     },
                   ),
@@ -586,8 +670,8 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
     // Simple calculation - in production, use proper Haversine formula
     if (_sosLocation == null) return 0;
 
-    final lat = responder['lat'] as double?;
-    final lng = responder['lng'] as double?;
+    final lat = _parseDouble(responder['lat']) ?? _parseDouble(responder['donor_lat']);
+    final lng = _parseDouble(responder['lng']) ?? _parseDouble(responder['donor_lng']);
 
     if (lat == null || lng == null) return 0;
 
@@ -595,6 +679,219 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
     final dLng = (lng - _sosLocation!.longitude) * 111 * (0.5 + 0.5 * (lat / 90).abs()); // Longitude varies by latitude
 
     return sqrt(dLat * dLat + dLng * dLng);
+  }
+
+  Future<void> _acceptResponder(String responseId) async {
+    if (_sosId == null) return;
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Accept Donor?'),
+        content: const Text('This donor will be notified that you have accepted them. They can now contact you for coordination.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Call API to accept
+    final result = await ApiService.acceptSosResponse(sosId: _sosId!, responseId: responseId);
+
+    if (result['success'] == true) {
+      // Reload data to show updated status
+      _loadSOSData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Donor accepted! They will be notified.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] as String? ?? 'Failed to accept donor'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDonation(String responseId) async {
+    if (_sosId == null) return;
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Confirm Donation?'),
+        content: const Text('Please confirm that this donor has completed the blood donation. This will help track successful donations.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Confirm Donation'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Call API to confirm
+    final result = await ApiService.confirmDonation(sosId: _sosId!, responseId: responseId);
+
+    if (result['success'] == true) {
+      // Reload data to show updated status
+      _loadSOSData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Donation confirmed! Thank you for updating.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] as String? ?? 'Failed to confirm donation'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _notifyDonorLate(String responseId, int minutesLate) async {
+    if (_sosId == null) return;
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Remind Donor?'),
+        content: Text('The donor is $minutesLate minutes late. Send them a gentle reminder?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Send Reminder'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Call API to notify donor
+    final result = await ApiService.notifyDonorLate(
+      sosId: _sosId!,
+      responseId: responseId,
+      minutesLate: minutesLate,
+    );
+
+    if (result['success'] == true) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reminder sent to donor!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] as String? ?? 'Failed to send reminder'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _markNoShow(String responseId) async {
+    if (_sosId == null) return;
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Mark as No-Show?'),
+        content: const Text('This will mark the donor as no-show. They will be notified. Are you sure?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
+            child: const Text('Mark No-Show'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Call API to mark no-show
+    final result = await ApiService.markNoShow(
+      sosId: _sosId!,
+      responseId: responseId,
+    );
+
+    if (result['success'] == true) {
+      // Reload data to show updated status
+      _loadSOSData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Donor marked as no-show'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] as String? ?? 'Failed to mark no-show'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildCancelButton() {
@@ -677,6 +974,12 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
   }
 
   void _showResponderDialog(Map<String, dynamic> responder) {
+    // Handle different field names from backend
+    final name = responder['donor_name'] as String? ?? responder['full_name'] as String? ?? 'Unknown';
+    final bloodGroup = responder['blood_group'] as String? ?? 'Unknown';
+    final eta = _parseInt(responder['estimated_arrival_minutes']);
+    final distance = _calculateDistance(responder);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -690,7 +993,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
               radius: 40,
               backgroundColor: AppColors.softPink,
               child: Text(
-                (responder['full_name'] as String? ?? 'D')[0].toUpperCase(),
+                name[0].toUpperCase(),
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -700,7 +1003,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              responder['full_name'] as String? ?? 'Unknown',
+              name,
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -715,7 +1018,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                responder['blood_group'] as String? ?? 'Unknown',
+                bloodGroup,
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -728,15 +1031,21 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildDialogStat(
-                  '${_calculateDistance(responder).toStringAsFixed(1)} km',
+                  '${distance.toStringAsFixed(1)} km',
                   'Distance',
                 ),
-                _buildDialogStat(
-                  (responder['is_available_for_donation'] as bool? ?? true)
-                      ? 'Available'
-                      : 'Busy',
-                  'Status',
-                ),
+                if (eta != null)
+                  _buildDialogStat(
+                    '$eta min',
+                    'ETA',
+                  )
+                else
+                  _buildDialogStat(
+                    (responder['is_available_for_donation'] as bool? ?? true)
+                        ? 'Available'
+                        : 'Busy',
+                    'Status',
+                  ),
               ],
             ),
             const SizedBox(height: 24),
@@ -790,6 +1099,38 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
       ],
     );
   }
+
+  /// Parse a value as double, handling both double and string inputs
+  double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  /// Parse a value as int, handling both int and string inputs
+  int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  /// Parse a datetime string into DateTime object
+  DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 class _ResponderCard extends StatelessWidget {
@@ -798,7 +1139,17 @@ class _ResponderCard extends StatelessWidget {
   final double distance;
   final String? image;
   final bool isAvailable;
+  final int? eta; // Estimated time of arrival in minutes
+  final String? status; // Response status: pending, accepted, donated, etc.
+  final String? responseId; // Response ID for actions
+  final String? sosId; // SOS ID for actions
+  final int? elapsedMinutes; // Minutes since acceptance (for no-show calculation)
+  final int? minutesLate; // Minutes past ETA (for late notification)
   final VoidCallback onTap;
+  final VoidCallback? onAccept; // Callback for accept action
+  final VoidCallback? onConfirm; // Callback for confirm donation action
+  final VoidCallback? onMarkNoShow; // Callback for mark no-show action
+  final VoidCallback? onNotifyLate; // Callback for notify donor late action
 
   const _ResponderCard({
     required this.name,
@@ -806,7 +1157,17 @@ class _ResponderCard extends StatelessWidget {
     required this.distance,
     this.image,
     required this.isAvailable,
+    this.eta,
+    this.status,
+    this.responseId,
+    this.sosId,
+    this.elapsedMinutes,
+    this.minutesLate,
     required this.onTap,
+    this.onAccept,
+    this.onConfirm,
+    this.onMarkNoShow,
+    this.onNotifyLate,
   });
 
   @override
@@ -905,7 +1266,7 @@ class _ResponderCard extends StatelessWidget {
 
                   const SizedBox(height: 4),
 
-                  // Distance
+                  // Distance and ETA Row
                   Row(
                     children: [
                       const Icon(
@@ -921,21 +1282,256 @@ class _ResponderCard extends StatelessWidget {
                           color: Colors.grey.shade600,
                         ),
                       ),
+                      if (eta != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.access_time, size: 10, color: Colors.green),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${eta}m',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
               ),
             ),
 
-            // Arrow Icon
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 12,
-              color: Colors.grey.shade400,
-            ),
+            // Action Buttons or Status Badge
+            _buildActionSection(),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildActionSection() {
+    // Show action buttons based on status
+    if (status == 'pending' && onAccept != null) {
+      // Show Accept button
+      return GestureDetector(
+        onTap: onAccept,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 16),
+              SizedBox(width: 4),
+              Text(
+                'Accept',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (status == 'accepted') {
+      // For accepted status, show different buttons based on lateness
+      if (minutesLate != null && minutesLate! >= 5) {
+        // Donor is late - show both "Notify Late" and "Confirm" buttons
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (onNotifyLate != null)
+              GestureDetector(
+                onTap: onNotifyLate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time, color: Colors.white, size: 14),
+                      const SizedBox(width: 3),
+                      Text(
+                        'Remind',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (onNotifyLate != null && onConfirm != null) const SizedBox(width: 6),
+            if (onConfirm != null)
+              GestureDetector(
+                onTap: onConfirm,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.favorite, color: Colors.white, size: 14),
+                      SizedBox(width: 3),
+                      Text(
+                        'Confirm',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (onMarkNoShow != null) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: onMarkNoShow,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade400,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.person_off, color: Colors.white, size: 14),
+                      const SizedBox(width: 3),
+                      Text(
+                        'No-Show',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      } else if (onConfirm != null) {
+        // Show Confirm Donation button (not late yet)
+        return GestureDetector(
+          onTap: onConfirm,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.green,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.favorite, color: Colors.white, size: 16),
+                SizedBox(width: 4),
+                Text(
+                  'Confirm',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      } else {
+        // Accepted but no actions available - show accepted badge
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.green.shade100,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 16),
+              SizedBox(width: 4),
+              Text(
+                'Accepted',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    } else if (status == 'donated') {
+      // Show Donated badge
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.green.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 16),
+            const SizedBox(width: 4),
+            Text(
+              'Donated',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.green,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (status == 'rejected') {
+      // Show Rejected badge
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'Passed',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey,
+          ),
+        ),
+      );
+    } else {
+      // Default arrow icon
+      return Icon(
+        Icons.arrow_forward_ios_rounded,
+        size: 12,
+        color: Colors.grey.shade400,
+      );
+    }
   }
 }
