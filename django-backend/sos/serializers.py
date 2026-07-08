@@ -81,14 +81,14 @@ class SOSResponseSerializer(serializers.ModelSerializer):
     responder_email = serializers.EmailField(source='responder.email', read_only=True)
     responder_id = serializers.UUIDField(source='responder.id', read_only=True)
     donor_lat = serializers.DecimalField(
-        source='responder.profile.lat',
+        source='responder.profile.location_lat',
         read_only=True,
         allow_null=True,
         max_digits=10,
         decimal_places=7
     )
     donor_lng = serializers.DecimalField(
-        source='responder.profile.lng',
+        source='responder.profile.location_lng',
         read_only=True,
         allow_null=True,
         max_digits=10,
