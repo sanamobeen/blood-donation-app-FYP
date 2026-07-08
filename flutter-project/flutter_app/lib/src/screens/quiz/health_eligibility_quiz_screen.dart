@@ -1127,11 +1127,9 @@ class _QuizResultScreen extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    if (canProceed) {
-                      Navigator.pushReplacementNamed(context, AppRoutes.nearbyRequests);
-                    } else {
-                      Navigator.pushReplacementNamed(context, AppRoutes.mainNavigation);
-                    }
+                    // Always navigate to main navigation (donor home screen)
+                    // Eligibility will control pledge button visibility
+                    Navigator.pushReplacementNamed(context, AppRoutes.mainNavigation);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isEligible ? AppColors.primary : AppColors.textSecondary,
@@ -1143,7 +1141,7 @@ class _QuizResultScreen extends StatelessWidget {
                     elevation: 2,
                   ),
                   child: Text(
-                    canProceed ? 'Continue to App' : 'Go Back',
+                    'Continue to App',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -1154,22 +1152,6 @@ class _QuizResultScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 16),
-
-              // Retake quiz button for ineligible users
-              if (!isEligible)
-                TextButton(
-                  onPressed: () {
-                    Navigator.pushReplacementNamed(context, AppRoutes.healthEligibilityQuiz);
-                  },
-                  child: Text(
-                    'Retake Quiz',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
