@@ -259,7 +259,7 @@ def send_sos_notification(
     }
 
     # Format notification title with patient name
-    title = f"{urgency_emoji.get(urgency, '🩸')} SOS: {patient_name}"
+    title = f"{urgency_emoji.get(urgency, '🩸')} Urgent Blood Request: {patient_name}"
 
     # Format notification body with all details
     body_parts = [
@@ -366,7 +366,7 @@ def send_batch_sos_notifications(
             distance_km = donor_distances.get(token, 0.0) if donor_distances else 0.0
 
             # Create personalized title with patient name
-            title = f"{urgency_emoji.get(urgency, '🩸')} SOS: {patient_name}"
+            title = f"{urgency_emoji.get(urgency, '🩸')} Urgent Blood Request: {patient_name}"
 
             # Create personalized body with all details
             body_parts = [

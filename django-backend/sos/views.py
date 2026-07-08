@@ -188,7 +188,7 @@ def notify_donors(request):
             if donor.fcm_token in unique_tokens:
                 Notification.objects.create(
                     user=donor.user,
-                    title=f'🚨 SOS: {patient_name or "Patient"}',
+                    title=f'🚨 Urgent Blood Request: {patient_name or "Patient"}',
                     message=f'{blood_type} blood needed at {hospital_name}. Only {donor_distances.get(donor.fcm_token, 0):.1f}km away.',
                     type='sos_alert',
                     related_request_id=notification_id,
@@ -342,7 +342,7 @@ def create_sos(request):
                         donor_profile = donor_data['profile']
                         Notification.objects.create(
                             user=donor_profile.user,
-                            title=f'🚨 SOS: {sos_request.patient_name or "Patient"}',
+                            title=f'🚨 Urgent Blood Request: {sos_request.patient_name or "Patient"}',
                             message=f'{sos_request.blood_type} blood needed at {sos_request.hospital_name}. Only {donor_data["distance"]:.1f}km away.',
                             type='sos_alert',
                             related_request_id=str(sos_request.id),

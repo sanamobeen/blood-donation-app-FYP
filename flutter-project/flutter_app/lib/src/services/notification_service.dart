@@ -263,7 +263,7 @@ class NotificationService {
     // Show high-priority notification with patient name in title
     LocalNotificationService().showNotification(
       id: message.hashCode,
-      title: '🚨 SOS: $patientName',
+      title: '🚨 Urgent Blood Request: $patientName',
       body: bodyParts.join('\n'),
       payload: jsonEncode(message.data),
       channelId: 'sos_critical',
