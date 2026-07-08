@@ -175,7 +175,9 @@ def notify_donors(request):
             hospital_address=hospital_address,
             sos_id=notification_id,
             urgency=urgency_level,
-            donor_distances=donor_distances
+            donor_distances=donor_distances,
+            patient_name=patient_name or 'Patient',
+            created_at=timezone.now().isoformat(),
         )
 
         logger.info(f"SOS [{notification_id}]: Sent {notification_result['success_count']} notifications, "
@@ -186,17 +188,19 @@ def notify_donors(request):
             if donor.fcm_token in unique_tokens:
                 Notification.objects.create(
                     user=donor.user,
-                    title=f'🚨 URGENT: {blood_type} Blood Needed!',
+                    title=f'🚨 SOS: {patient_name or "Patient"}',
                     message=f'{blood_type} blood needed at {hospital_name}. Only {donor_distances.get(donor.fcm_token, 0):.1f}km away.',
                     type='sos_alert',
                     related_request_id=notification_id,
                     data={
                         'sos_id': notification_id,
+                        'patient_name': patient_name or 'Patient',
                         'blood_type': blood_type,
                         'hospital_name': hospital_name,
                         'hospital_address': hospital_address,
                         'distance_km': donor_distances.get(donor.fcm_token, 0),
                         'urgency': urgency_level,
+                        'created_at': timezone.now().isoformat(),
                     }
                 )
                 logger.info(f"Created in-app notification for donor {donor.user.email}")
@@ -326,7 +330,9 @@ def create_sos(request):
                         hospital_address=sos_request.hospital_address,
                         sos_id=str(sos_request.id),
                         urgency='critical',
-                        donor_distances={d['fcm_token']: d['distance'] for d in eligible_donors}
+                        donor_distances={d['fcm_token']: d['distance'] for d in eligible_donors},
+                        patient_name=sos_request.patient_name or 'Patient',
+                        created_at=sos_request.created_at.isoformat(),
                     )
                     success_count = notification_result.get('success_count', 0)
                     logger.info(f"Sent {success_count} SOS notifications to nearby donors")
@@ -336,17 +342,19 @@ def create_sos(request):
                         donor_profile = donor_data['profile']
                         Notification.objects.create(
                             user=donor_profile.user,
-                            title=f'🚨 URGENT: {sos_request.blood_type} Blood Needed!',
+                            title=f'🚨 SOS: {sos_request.patient_name or "Patient"}',
                             message=f'{sos_request.blood_type} blood needed at {sos_request.hospital_name}. Only {donor_data["distance"]:.1f}km away.',
                             type='sos_alert',
                             related_request_id=str(sos_request.id),
                             data={
                                 'sos_id': str(sos_request.id),
+                                'patient_name': sos_request.patient_name or 'Patient',
                                 'blood_type': sos_request.blood_type,
                                 'hospital_name': sos_request.hospital_name,
                                 'hospital_address': sos_request.hospital_address,
                                 'distance_km': donor_data['distance'],
                                 'urgency': 'critical',
+                                'created_at': sos_request.created_at.isoformat(),
                             }
                         )
                         logger.info(f"Created in-app notification for donor {donor_profile.user.email}")

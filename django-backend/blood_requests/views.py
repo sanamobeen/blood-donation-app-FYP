@@ -2819,7 +2819,9 @@ async def send_sos_notifications(request):
             hospital_address=hospital_address,
             sos_id=notification_id,
             urgency=urgency_level,
-            donor_distances=donor_distances
+            donor_distances=donor_distances,
+            patient_name=patient_name or 'Patient',
+            created_at=timezone.now().isoformat(),
         )
 
         logger.info(f"SOS [{notification_id}]: Sent {notification_result['success_count']} notifications, "
