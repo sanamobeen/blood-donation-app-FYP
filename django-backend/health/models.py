@@ -101,6 +101,19 @@ class EligibilityRecord(models.Model):
         blank=True
     )
     eligibility_valid_until = models.DateField(null=True, blank=True)
+
+    # New fields to track ineligibility period after failed quiz
+    last_failed_quiz_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of the last failed quiz attempt"
+    )
+    ineligible_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="User cannot donate/pledge until this datetime (30-day penalty after failed quiz)"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -110,3 +123,30 @@ class EligibilityRecord(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - Eligible: {self.is_eligible}"
+
+    def is_currently_eligible(self):
+        """
+        Check if user is currently eligible to donate/pledge.
+
+        Returns a tuple: (is_eligible, message, cooldown_days_remaining)
+        """
+        from django.utils import timezone
+
+        # Check if user is in ineligibility period due to failed quiz
+        if self.ineligible_until and self.ineligible_until > timezone.now():
+            days_remaining = (self.ineligible_until - timezone.now()).days
+            return False, "Quiz failed - ineligible period", days_remaining + 1  # Round up
+
+        # Check if eligibility is still valid (within 30 days of last successful quiz)
+        if self.is_eligible and self.eligibility_valid_until:
+            if self.eligibility_valid_until >= timezone.now().date():
+                return True, "Eligible", 0
+            else:
+                # Eligibility expired but no penalty - user just needs to retake quiz
+                return False, "Eligibility expired - retake quiz required", 0
+
+        # User is not eligible (failed quiz and eligibility expired)
+        if not self.is_eligible:
+            return False, "Not eligible - failed quiz", 0
+
+        return True, "Eligible", 0

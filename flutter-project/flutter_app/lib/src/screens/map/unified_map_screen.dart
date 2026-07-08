@@ -131,8 +131,8 @@ class _UnifiedMapScreenState extends State<UnifiedMapScreen> {
   Future<void> _loadMyPledges() async {
     try {
       final pledgesResponse = await ApiService.getMyPledges();
-      if (pledgesResponse['success'] == true) {
-        final pledges = pledgesResponse['pledges'] as List? ?? [];
+      if (pledgesResponse['success'] == true && pledgesResponse['data'] != null) {
+        final pledges = pledgesResponse['data']['pledges'] as List? ?? [];
         setState(() {
           _pledgedRequestIds = pledges
               .map((p) => p['blood_request']?.toString() ?? '')

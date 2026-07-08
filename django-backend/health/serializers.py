@@ -47,6 +47,8 @@ class EligibilityRecordSerializer(serializers.ModelSerializer):
 
     last_quiz_date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
     eligibility_valid_until = serializers.DateField(format='%Y-%m-%d', allow_null=True)
+    last_failed_quiz_date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', allow_null=True)
+    ineligible_until = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', allow_null=True)
 
     class Meta:
         model = EligibilityRecord
@@ -54,5 +56,7 @@ class EligibilityRecordSerializer(serializers.ModelSerializer):
             'is_eligible',
             'last_quiz_date',
             'eligibility_valid_until',
-            'disqualification_reasons'
+            'disqualification_reasons',
+            'last_failed_quiz_date',
+            'ineligible_until'
         ]
