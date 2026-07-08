@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/role_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/firebase_chat_service.dart';
+import '../../services/notification_service.dart';
 import '../../models/profile.dart';
 import '../../models/blood_request.dart';
 import '../../widgets/bottom_navigation_bar.dart';
@@ -84,6 +85,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return;
     }
 
+    // Initialize push notifications
+    try {
+      await NotificationService().initialize();
+      debugPrint('NotificationService initialized successfully');
+    } catch (e) {
+      debugPrint('Failed to initialize NotificationService: $e');
+    }
+
     // Load role if not already loaded
     final roleProvider = Provider.of<RoleProvider>(context, listen: false);
 
@@ -111,34 +120,65 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       final result = await ApiService.getHealthEligibilityStatus();
 
       if (result['success'] == true) {
-        final eligibility = result['eligibility'] as Map<String, dynamic>? ?? {};
-        final isStillValid = result['is_still_valid'] as bool? ?? true;
-        final healthQuizCompleted = eligibility['health_quiz_completed'] as bool? ?? false;
+        try {
+          // Check the new response format with cooldown information
+          if (result['data'] != null) {
+            final innerData = result['data'] as Map;
+            final eligibilityData = innerData['data'] as Map;
 
-        // Debug logging
-        print('DEBUG: Eligibility check result: $result');
-        print('DEBUG: health_quiz_completed: $healthQuizCompleted');
-        print('DEBUG: is_still_valid: $isStillValid');
+            final isEligible = eligibilityData['is_eligible'] as bool? ?? true;
+            final cooldownDaysRemaining = eligibilityData['cooldown_days_remaining'] as int? ?? 0;
+            final message = eligibilityData['message'] as String? ?? '';
 
-        // If health quiz not completed or eligibility is not valid, redirect to quiz
-        if (!healthQuizCompleted || !isStillValid) {
-          if (mounted) {
-            _showEligibilityRequiredDialog();
+            print('DEBUG: Eligibility check - is_eligible: $isEligible, cooldown_days: $cooldownDaysRemaining, message: $message');
+
+            // Show quiz prompt only if:
+            // 1. User is NOT in cooldown period AND
+            // 2. User is NOT eligible (needs to take/retake quiz)
+            if (cooldownDaysRemaining <= 0 && !isEligible) {
+              // User needs to take/retake quiz
+              if (mounted) {
+                _showEligibilityRequiredDialog();
+              }
+            } else if (cooldownDaysRemaining > 0) {
+              // User is in ineligibility period - don't show quiz prompt
+              print('DEBUG: User is in ineligibility period. Not showing quiz prompt.');
+            } else {
+              // User is eligible - don't show quiz prompt
+              print('DEBUG: User is eligible. Not showing quiz prompt.');
+            }
+          } else {
+            print('DEBUG: No data in response');
+          }
+        } catch (e) {
+          print('DEBUG: Error parsing new format, trying fallback: $e');
+          // Fallback to old format if needed
+          try {
+            final eligibility = result['eligibility'] as Map;
+            final isStillValid = result['is_still_valid'] as bool? ?? true;
+            final healthQuizCompleted = eligibility['health_quiz_completed'] as bool? ?? false;
+
+            print('DEBUG: Using old format - health_quiz_completed: $healthQuizCompleted, is_still_valid: $isStillValid');
+
+            if (!healthQuizCompleted || !isStillValid) {
+              if (mounted) {
+                _showEligibilityRequiredDialog();
+              }
+            }
+          } catch (e2) {
+            print('DEBUG: Error parsing old format too: $e2');
           }
         }
       } else {
         // API returned success=false
         print('DEBUG: Eligibility API returned success=false: ${result['message']}');
-        if (mounted) {
-          _showEligibilityRequiredDialog();
-        }
+        // Don't show quiz prompt on API failure - user can still use the app
+        print('DEBUG: Not showing quiz prompt due to API failure');
       }
     } catch (e) {
-      // Log error and show dialog to ensure user can complete quiz
+      // Log error but don't show dialog - user can still use the app
       print('DEBUG: Eligibility check failed with error: $e');
-      if (mounted) {
-        _showEligibilityRequiredDialog();
-      }
+      print('DEBUG: Not showing quiz prompt due to error');
     }
   }
 
@@ -2030,6 +2070,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             title: 'SOS',
             icon: Icons.sos,
             onTap: () => Navigator.pushNamed(context, AppRoutes.sos),
+          ),
+          const SizedBox(width: 12),
+          _QuickActionButton(
+            title: 'SOS Active',
+            icon: Icons.notifications_active,
+            onTap: () => Navigator.pushNamed(context, AppRoutes.sosActive),
           ),
         ],
       ),

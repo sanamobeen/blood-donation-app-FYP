@@ -1497,6 +1497,37 @@ class ApiService {
     }
   }
 
+  /// Get current user's active SOS requests
+  static Future<Map<String, dynamic>> getMyActiveSosRequests() async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.sosEndpoint}/my-active/'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data;
+      } else {
+        return {
+          'success': false,
+          'message': 'Failed to fetch active SOS requests',
+          'requests': [],
+          'count': 0,
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Network error: $e',
+        'requests': [],
+        'count': 0,
+      };
+    }
+  }
+
   /// Respond to SOS
   static Future<Map<String, dynamic>> respondToSos({
     required String sosId,
@@ -1573,6 +1604,245 @@ class ApiService {
         return {'success': true, 'data': data};
       } else {
         return {'success': false, 'message': data['message'] ?? 'Failed to cancel SOS'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Accept SOS response (patient accepts a donor)
+  static Future<Map<String, dynamic>> acceptSosResponse({
+    required String sosId,
+    required String responseId,
+  }) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.sosEndpoint}/$sosId/accept-response/$responseId/'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Failed to accept response'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Reject SOS response (patient rejects a donor)
+  static Future<Map<String, dynamic>> rejectSosResponse({
+    required String sosId,
+    required String responseId,
+  }) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.sosEndpoint}/$sosId/reject-response/$responseId/'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Failed to reject response'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Confirm donation (patient confirms donor has donated)
+  static Future<Map<String, dynamic>> confirmDonation({
+    required String sosId,
+    required String responseId,
+  }) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.sosEndpoint}/$sosId/confirm-donation/$responseId/'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Failed to confirm donation'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Mark donor as no-show (patient action)
+  static Future<Map<String, dynamic>> markNoShow({
+    required String sosId,
+    required String responseId,
+  }) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.sosEndpoint}/$sosId/mark-no-show/$responseId/'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Failed to mark no-show'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Notify donor they are late (patient action)
+  static Future<Map<String, dynamic>> notifyDonorLate({
+    required String sosId,
+    required String responseId,
+    int minutesLate = 5,
+  }) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.sosEndpoint}/$sosId/notify-donor-late/$responseId/'),
+        headers: headers,
+        body: jsonEncode({
+          'minutes_late': minutesLate,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data, 'message': data['message']};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Failed to notify donor'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Donor confirms they cannot arrive (donor action)
+  static Future<Map<String, dynamic>> donorCannotArrive({
+    required String sosId,
+    required String responseId,
+    String? reason,
+  }) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.sosEndpoint}/$sosId/donor-cannot-arrive/$responseId/'),
+        headers: headers,
+        body: jsonEncode({
+          if (reason != null) 'reason': reason,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data, 'message': data['message']};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Failed to cancel response'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Confirm donor is on their way (donor action after being accepted)
+  static Future<Map<String, dynamic>> confirmOnMyWay({
+    required String sosId,
+    required String responseId,
+  }) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.sosEndpoint}/$sosId/confirm-on-my-way/$responseId/'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data, 'message': data['message']};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Failed to confirm'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Update donor ETA (donor action)
+  static Future<Map<String, dynamic>> updateResponseEta({
+    required String sosId,
+    required String responseId,
+    required int estimatedArrivalMinutes,
+    String? note,
+  }) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.sosEndpoint}/$sosId/update-eta/$responseId/'),
+        headers: headers,
+        body: jsonEncode({
+          'estimated_arrival_minutes': estimatedArrivalMinutes,
+          if (note != null) 'note': note,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data, 'message': data['message']};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Failed to update ETA'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  /// Confirm donor arrival (donor action)
+  static Future<Map<String, dynamic>> confirmDonorArrival({
+    required String sosId,
+    required String responseId,
+  }) async {
+    try {
+      final headers = await getAuthHeaders();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.sosEndpoint}/$sosId/confirm-arrival/$responseId/'),
+        headers: headers,
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data, 'message': data['message']};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Failed to confirm arrival'};
       }
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
@@ -2702,7 +2972,7 @@ class ApiService {
   }
 
   /// Confirm donation received from donor (patient only)
-  static Future<Map<String, dynamic>> confirmDonation({
+  static Future<Map<String, dynamic>> confirmPledgeDonation({
     required String requestId,
     required String pledgeId,
     required int unitsReceived,

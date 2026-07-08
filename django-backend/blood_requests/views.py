@@ -704,8 +704,9 @@ def nearby_blood_requests(request):
 
 def check_donor_eligibility(user, exclude_request_id=None):
     """
-    Check if donor is eligible to pledge based on recent completed donations.
-    In the new flow, donors can pledge to multiple requests - patients decide which to accept.
+    Check if donor is eligible to pledge based on:
+    1. Recent completed donations (56-day cooldown)
+    2. Health quiz ineligibility period (30-day penalty after failed quiz)
 
     Returns a tuple: (is_eligible, message, cooldown_days_remaining)
     """
@@ -714,6 +715,26 @@ def check_donor_eligibility(user, exclude_request_id=None):
 
     try:
         from django.utils import timezone
+
+        # First, check health quiz eligibility status
+        from health.models import EligibilityRecord
+        eligibility_record = EligibilityRecord.objects.filter(user=user).first()
+
+        if eligibility_record:
+            # Use the model's is_currently_eligible method
+            is_quiz_eligible, quiz_message, quiz_cooldown_days = eligibility_record.is_currently_eligible()
+
+            if not is_quiz_eligible and quiz_cooldown_days > 0:
+                # User is in ineligibility period due to failed quiz
+                return (
+                    False,
+                    f'You failed the health quiz and must wait {quiz_cooldown_days} more days before you can pledge to donate.',
+                    quiz_cooldown_days
+                )
+            elif not is_quiz_eligible:
+                # Quiz eligibility expired or failed but no active cooldown
+                # This is handled by the pledge creation endpoint
+                pass
 
         # Check for recent completed pledges (donations that were completed)
         cooldown_cutoff = timezone.now() - timedelta(days=COOLDOWN_DAYS)
@@ -835,29 +856,33 @@ def create_pledge(request, request_id):
             eligibility_record = EligibilityRecord.objects.filter(user=request.user).first()
 
             if eligibility_record:
-                # Check if eligibility is still valid (within 30 days)
-                is_still_valid = True
-                if eligibility_record.eligibility_valid_until:
-                    if eligibility_record.eligibility_valid_until < timezone.now().date():
-                        is_still_valid = False
+                # Use the model's is_currently_eligible method to check eligibility
+                is_eligible, message, cooldown_days = eligibility_record.is_currently_eligible()
 
-                # If not eligible or eligibility expired, prevent pledge
-                if not eligibility_record.is_eligible:
-                    logger.info(f"❌ User not eligible based on health quiz: {eligibility_record.disqualification_reasons}")
-                    return error_response(
-                        message=f'You are not eligible to donate based on your health quiz responses. Reasons: {", ".join(eligibility_record.disqualification_reasons)}. Please consult with a healthcare provider.',
-                        status_code=status.HTTP_403_FORBIDDEN
-                    )
+                if not is_eligible:
+                    logger.info(f"❌ User not eligible to pledge: {message}, cooldown_days: {cooldown_days}")
 
-                if not is_still_valid:
-                    logger.info(f"❌ User health eligibility expired on {eligibility_record.eligibility_valid_until}")
+                    # Determine appropriate error message and error code
+                    if cooldown_days > 0:
+                        # User is in ineligibility period due to failed quiz
+                        error_message = f'You failed the health quiz and must wait {cooldown_days} more days before you can pledge to donate.'
+                        error_code = 'INELIGIBILITY_PERIOD_ACTIVE'
+                    elif 'expired' in message.lower():
+                        # Eligibility expired but no penalty - user needs to retake quiz
+                        error_message = 'Your health eligibility has expired (valid for 30 days). Please retake the health eligibility quiz before pledging.'
+                        error_code = 'ELIGIBILITY_EXPIRED'
+                    else:
+                        # User failed quiz but ineligibility period has passed
+                        error_message = 'You are not eligible to donate based on your health quiz responses. Please retake the quiz.'
+                        error_code = 'QUIZ_REQUIRED'
+
                     return error_response(
-                        message='Your health eligibility has expired (valid for 30 days). Please retake the health eligibility quiz before pledging.',
+                        message=error_message,
                         status_code=status.HTTP_403_FORBIDDEN,
-                        error_code='ELIGIBILITY_EXPIRED'
+                        error_code=error_code
                     )
 
-                logger.info(f"✅ User health eligibility confirmed: valid until {eligibility_record.eligibility_valid_until}")
+                logger.info(f"✅ User health eligibility confirmed")
             else:
                 # No eligibility record found - require quiz
                 logger.info(f"❌ No health eligibility record found for user")

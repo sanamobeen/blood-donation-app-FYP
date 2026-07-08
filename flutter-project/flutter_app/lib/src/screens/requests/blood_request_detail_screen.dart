@@ -247,10 +247,15 @@ class _BloodRequestDetailScreenState extends State<BloodRequestDetailScreen> {
       if (mounted) {
         setState(() {
           if (response['success'] == true && response['data'] != null) {
-            final data = response['data']['data'] as Map<String, dynamic>?;
-            _isEligibleToDonate = data?['is_eligible'] ?? true;
-            _ineligibilityMessage = data?['message'];
-            _cooldownDaysRemaining = data?['cooldown_days_remaining'] ?? 0;
+            try {
+              final data = response['data'] as Map;
+              _isEligibleToDonate = data['is_eligible'] ?? true;
+              _ineligibilityMessage = data['message'];
+              _cooldownDaysRemaining = data['cooldown_days_remaining'] ?? 0;
+            } catch (e) {
+              // If parsing fails, assume eligible (don't block user)
+              _isEligibleToDonate = true;
+            }
           } else {
             // If check fails, assume eligible (don't block user)
             _isEligibleToDonate = true;

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import '../config/api_config.dart';
+import '../app_routes.dart';
 import 'local_notification_service.dart';
 
 /// Service for handling Firebase Cloud Messaging (FCM) push notifications
@@ -28,6 +30,10 @@ class NotificationService {
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   bool _isInitialized = false;
 
+  /// Navigator key for navigation from notifications
+  /// Set this from your app's MaterialApp navigatorKey
+  static GlobalKey<NavigatorState>? navigatorKey;
+
   /// Initialize the notification service
   ///
   /// Call this once on app startup (usually in main.dart)
@@ -35,12 +41,15 @@ class NotificationService {
     if (_isInitialized) return;
 
     try {
+      debugPrint('🔔 NotificationService: Starting initialization...');
 
       // Request permission for iOS
       await _requestPermission();
+      debugPrint('🔔 NotificationService: Permission requested');
 
       // Get and register FCM token
       await _handleFCMToken();
+      debugPrint('🔔 NotificationService: FCM token handled');
 
       // Configure foreground message handling
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -58,7 +67,9 @@ class NotificationService {
       FirebaseMessaging.instance.onTokenRefresh.listen(_onTokenRefresh);
 
       _isInitialized = true;
+      debugPrint('🔔 NotificationService: Initialization complete!');
     } catch (e) {
+      debugPrint('🔔 NotificationService: Initialization failed - $e');
     }
   }
 
@@ -86,17 +97,31 @@ class NotificationService {
   /// Handle FCM token - get, store, and register with backend
   Future<void> _handleFCMToken() async {
     try {
+      debugPrint('🔔 Getting FCM token from Firebase...');
       // Get FCM token
       String? token = await _fcm.getToken();
 
       if (token != null && token.isNotEmpty) {
+        debugPrint('🔔 FCM Token obtained: ${token.substring(0, 20)}...');
+
         // Save token locally
         await _saveFCMToken(token);
+        debugPrint('🔔 FCM Token saved locally');
 
         // Register with backend
-        await registerTokenWithBackend(token);
+        debugPrint('🔔 Registering token with backend...');
+        final success = await registerTokenWithBackend(token);
+
+        if (success) {
+          debugPrint('🔔 ✅ FCM Token registered with backend successfully!');
+        } else {
+          debugPrint('🔔 ❌ Failed to register FCM token with backend');
+        }
+      } else {
+        debugPrint('🔔 ❌ FCM Token is null or empty');
       }
     } catch (e) {
+      debugPrint('🔔 ❌ Error handling FCM token: $e');
     }
   }
 
@@ -121,16 +146,22 @@ class NotificationService {
   /// Register FCM token with backend
   Future<bool> registerTokenWithBackend(String token) async {
     try {
+      debugPrint('🔔 RegisterTokenWithBackend: Starting...');
+
       final prefs = await SharedPreferences.getInstance();
       final accessToken = prefs.getString('access_token');
 
+      debugPrint('🔔 Access token exists: ${accessToken != null && accessToken.isNotEmpty}');
+
       if (accessToken == null || accessToken.isEmpty) {
+        debugPrint('🔔 ❌ No access token - cannot register FCM token');
         return false;
       }
 
-      // Use the new FCM token endpoint
+      // Use the FCM token endpoint from auth endpoint
+      debugPrint('🔔 Calling: ${ApiConfig.authEndpoint}/fcm-token/');
       final response = await http.post(
-        Uri.parse('${ApiConfig.getBaseUrl()}/api/auth/fcm-token/'),
+        Uri.parse('${ApiConfig.authEndpoint}/fcm-token/'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
@@ -140,16 +171,22 @@ class NotificationService {
         }),
       );
 
+      debugPrint('🔔 Response status code: ${response.statusCode}');
+      debugPrint('🔔 Response body: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
 
         // Mark as registered
         await prefs.setBool(_tokenRegisteredKey, true);
+        debugPrint('🔔 ✅ FCM token registered successfully');
         return true;
       } else {
+        debugPrint('🔔 ❌ FCM token registration failed with status ${response.statusCode}');
         return false;
       }
     } catch (e) {
+      debugPrint('🔔 ❌ Exception in registerTokenWithBackend: $e');
       return false;
     }
   }
@@ -232,9 +269,26 @@ class NotificationService {
 
   /// Navigate to SOS details screen
   void _navigateToSOSDetails(Map<String, dynamic> data) {
-    // TODO: Implement navigation to SOS details screen
-    // This should open the blood request details with pre-filled pledge form
-    // Navigator.of(context).pushNamed('/sos-details', arguments: data);
+    if (navigatorKey?.currentState == null) {
+      debugPrint('Navigator key not set or not ready for SOS navigation');
+      return;
+    }
+
+    final sosId = data['sos_id'] as String?;
+    if (sosId == null || sosId.isEmpty) {
+      debugPrint('SOS ID not found in notification data');
+      return;
+    }
+
+    try {
+      // Navigate to SOS detail screen
+      navigatorKey!.currentState!.pushNamed(
+        AppRoutes.sosDetail,
+        arguments: {'sosId': sosId},
+      );
+    } catch (e) {
+      debugPrint('Failed to navigate to SOS detail: $e');
+    }
   }
 
   /// Get device type string

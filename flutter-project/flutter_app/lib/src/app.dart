@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'app_routes.dart';
 import 'theme/app_theme.dart';
@@ -11,6 +12,7 @@ import 'providers/role_provider.dart';
 import 'providers/admin_provider.dart';
 import 'screens/requests/blood_request_detail_screen.dart';
 import 'screens/messages/chat_conversation_screen_api.dart';
+import 'services/notification_service.dart';
 
 class LifeDropApp extends StatefulWidget {
   const LifeDropApp({super.key});
@@ -26,7 +28,24 @@ class _LifeDropAppState extends State<LifeDropApp> {
   @override
   void initState() {
     super.initState();
+    _initializeFirebase();
     _initDeepLinks();
+    // Set navigator key for notification service navigation
+    NotificationService.navigatorKey = navigatorKey;
+  }
+
+  /// Initialize Firebase Core
+  Future<void> _initializeFirebase() async {
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+        debugPrint('Firebase initialized successfully');
+      } else {
+        debugPrint('Firebase already initialized');
+      }
+    } catch (e) {
+      debugPrint('Firebase initialization failed: $e');
+    }
   }
 
   @override

@@ -228,17 +228,29 @@ def submit_quiz_responses(request):
                 'last_quiz_date': timezone.now(),
                 'last_quiz_response': quiz_response,
                 'disqualification_reasons': disqualification_reasons,
-                'eligibility_valid_until': timezone.now().date() + timedelta(days=30)
+                'eligibility_valid_until': timezone.now().date() + timedelta(days=30) if is_eligible else timezone.now().date()
             }
         )
 
-        if not created:
-            eligibility_record.is_eligible = is_eligible
-            eligibility_record.last_quiz_date = timezone.now()
-            eligibility_record.last_quiz_response = quiz_response
-            eligibility_record.disqualification_reasons = disqualification_reasons
+        # Update eligibility record based on quiz result
+        eligibility_record.is_eligible = is_eligible
+        eligibility_record.last_quiz_date = timezone.now()
+        eligibility_record.last_quiz_response = quiz_response
+        eligibility_record.disqualification_reasons = disqualification_reasons
+
+        if is_eligible:
+            # User passed the quiz - set 30-day validity for eligibility
             eligibility_record.eligibility_valid_until = timezone.now().date() + timedelta(days=30)
-            eligibility_record.save()
+            eligibility_record.last_failed_quiz_date = None
+            eligibility_record.ineligible_until = None
+        else:
+            # User failed the quiz - apply 30-day ineligibility penalty
+            eligibility_record.eligibility_valid_until = timezone.now().date()  # Expired immediately
+            eligibility_record.last_failed_quiz_date = timezone.now()
+            eligibility_record.ineligible_until = timezone.now() + timedelta(days=30)
+            logger.info(f"User {request.user.email} failed health quiz. Ineligible until {eligibility_record.ineligible_until}")
+
+        eligibility_record.save()
 
         # Update user profile health quiz completion status
         from account.models import UserProfile
@@ -253,15 +265,15 @@ def submit_quiz_responses(request):
 
         # Prepare response message
         if is_eligible:
-            message = "Congratulations! You are eligible to request blood donation. You can proceed with creating your blood request."
+            message = "Congratulations! You are eligible to donate blood. You can proceed to the donor home screen."
         else:
-            message = "Based on your responses, you may not be eligible to request blood donation at this time. Please consult with a healthcare provider for more information."
+            message = "Based on your responses, you are not eligible to donate blood at this time. You can still browse requests and share them with others, but you cannot pledge to donate."
 
         result_serializer = QuizResultSerializer({
             'is_eligible': is_eligible,
             'message': message,
             'disqualification_reasons': disqualification_reasons,
-            'can_proceed': is_eligible
+            'can_proceed': True  # Always allow users to proceed to the app
         })
 
         return Response({
@@ -288,11 +300,12 @@ def get_eligibility_status(request):
     Response:
     {
         "success": true,
-        "eligibility": {
-            "is_eligible": true,
-            "last_quiz_date": "...",
-            "eligibility_valid_until": "...",
-            "disqualification_reasons": []
+        "data": {
+            "data": {
+                "is_eligible": true,
+                "message": "...",
+                "cooldown_days_remaining": 0
+            }
         }
     }
     """
@@ -302,56 +315,36 @@ def get_eligibility_status(request):
         ).first()
 
         if eligibility_record:
-            # Check if eligibility is still valid
-            is_still_valid = True
-            if eligibility_record.eligibility_valid_until:
-                if eligibility_record.eligibility_valid_until < timezone.now().date():
-                    is_still_valid = False
+            # Use the model's is_currently_eligible method
+            is_eligible, message, cooldown_days = eligibility_record.is_currently_eligible()
 
             serializer = EligibilityRecordSerializer(eligibility_record)
             response_data = serializer.data
-            response_data['is_still_valid'] = is_still_valid
-
-            # Add profile health quiz status
-            from account.models import UserProfile
-            try:
-                user_profile = UserProfile.objects.get(user=request.user)
-                response_data['health_quiz_completed'] = user_profile.health_quiz_completed
-                response_data['health_quiz_completed_at'] = user_profile.health_quiz_completed_at.isoformat() if user_profile.health_quiz_completed_at else None
-            except UserProfile.DoesNotExist:
-                response_data['health_quiz_completed'] = False
-                response_data['health_quiz_completed_at'] = None
 
             return Response({
                 'success': True,
-                'eligibility': response_data,
-                'is_still_valid': is_still_valid
+                'data': {
+                    'data': {
+                        'is_eligible': is_eligible,
+                        'message': message,
+                        'cooldown_days_remaining': cooldown_days,
+                        'last_quiz_date': response_data.get('last_quiz_date'),
+                        'ineligible_until': response_data.get('ineligible_until'),
+                        'disqualification_reasons': response_data.get('disqualification_reasons', [])
+                    }
+                }
             }, status=status.HTTP_200_OK)
         else:
-            # No eligibility record - check profile for quiz completion
-            from account.models import UserProfile
-            health_quiz_completed = False
-            health_quiz_completed_at = None
-
-            try:
-                user_profile = UserProfile.objects.get(user=request.user)
-                health_quiz_completed = user_profile.health_quiz_completed
-                health_quiz_completed_at = user_profile.health_quiz_completed_at.isoformat() if user_profile.health_quiz_completed_at else None
-            except UserProfile.DoesNotExist:
-                pass
-
+            # No eligibility record found
             return Response({
                 'success': True,
-                'eligibility': {
-                    'is_eligible': None,
-                    'last_quiz_date': None,
-                    'eligibility_valid_until': None,
-                    'disqualification_reasons': [],
-                    'health_quiz_completed': health_quiz_completed,
-                    'health_quiz_completed_at': health_quiz_completed_at
-                },
-                'is_still_valid': False,
-                'message': 'No eligibility record found. Please complete the health quiz.'
+                'data': {
+                    'data': {
+                        'is_eligible': None,
+                        'message': 'No eligibility record found. Please complete the health quiz.',
+                        'cooldown_days_remaining': 0
+                    }
+                }
             }, status=status.HTTP_200_OK)
 
     except Exception as e:

@@ -6,7 +6,7 @@ import 'screens/auth/profile_setup_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/auth/sign_up_screen.dart';
 import 'screens/auth/change_password_step1_screen.dart';
-import 'screens/auth/change_password_step2_screen.dart';
+// import 'screens/auth/change_password_step2_screen.dart'; // Not currently used
 import 'screens/ai_chatbot/ai_chatbot_screen.dart';
 import 'screens/blood_request/blood_request_form_screen.dart';
 // Quiz screen removed from patient flow
@@ -29,6 +29,7 @@ import 'screens/requests/nearby_requests_screen.dart';
 import 'screens/role_selection/role_selection_screen.dart';
 import 'screens/sos/sos_screen_api.dart';
 import 'screens/sos/sos_active_screen.dart';
+import 'screens/sos/sos_detail_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/help/help_screen.dart';
@@ -57,6 +58,7 @@ class AppRoutes {
   static const mainNavigation = '/main-navigation';
   static const sos = '/sos';
   static const sosActive = '/sos-active';
+  static const sosDetail = '/sos-detail';
   static const myDonations = '/my-donations';
   static const donorProfile = '/donor-profile';
   static const unifiedMap = '/unified-map';
@@ -98,7 +100,16 @@ class AppRoutes {
     home: (context) => const MainNavigationScreen(), // Redirect to MainNavigationScreen
     mainNavigation: (context) => const MainNavigationScreen(),
     sos: (context) => const SOSScreenApi(),
-    sosActive: (context) => const SOSActiveScreen(),
+    sosActive: (context) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final sosId = args?['sosId'] as String?;
+      return SOSActiveScreen(sosId: sosId);
+    },
+    sosDetail: (context) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final sosId = args?['sosId'] as String? ?? '';
+      return SOSDetailScreen(sosId: sosId);
+    },
     unifiedMap: (context) => const UnifiedMapScreen(),
     donorProfile: (context) {
       final donor = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
