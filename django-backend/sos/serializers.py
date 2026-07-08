@@ -29,7 +29,7 @@ class SOSRequestSerializer(serializers.ModelSerializer):
 
     def validate_age(self, value):
         """Validate age is reasonable"""
-        if value < 0 or value > 120:
+        if value is not None and (value < 0 or value > 120):
             raise serializers.ValidationError("Please enter a valid age.")
         return value
 

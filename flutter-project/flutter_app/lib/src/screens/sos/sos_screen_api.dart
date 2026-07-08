@@ -26,14 +26,10 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
   // Selected values
   String? _selectedBloodGroup;
   int _unitsNeeded = 1;
-  String _situationDescription = '';
 
   // Form controllers
   final TextEditingController _contactPhoneController = TextEditingController();
   final TextEditingController _patientNameController = TextEditingController();
-  final TextEditingController _ageController = TextEditingController();
-  late final TextEditingController _situationController;
-  String? _selectedGender;
 
   // Location data
   SelectedLocation? _selectedLocation;
@@ -51,7 +47,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
   @override
   void initState() {
     super.initState();
-    _situationController = TextEditingController(text: _situationDescription);
 
     _loadUserProfile();
     _getCurrentLocation();
@@ -61,8 +56,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
   void dispose() {
     _contactPhoneController.dispose();
     _patientNameController.dispose();
-    _ageController.dispose();
-    _situationController.dispose();
     super.dispose();
   }
 
@@ -398,38 +391,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
             ),
             const SizedBox(height: 20),
 
-            // Age and Gender Row
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionTitle('Age*'),
-                      const SizedBox(height: 12),
-                      _buildInputField(
-                        controller: _ageController,
-                        hintText: 'Age',
-                        keyboardType: TextInputType.number,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionTitle('Gender*'),
-                      const SizedBox(height: 12),
-                      _buildGenderSelector(),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
             // Hospital Location
             _buildSectionTitle('Hospital Location*'),
             const SizedBox(height: 12),
@@ -459,12 +420,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
             const SizedBox(height: 12),
             _buildDistanceSelector(),
             const SizedBox(height: 20),
-
-            // Additional Notes
-            _buildSectionTitle('Additional Notes (Optional)'),
-            const SizedBox(height: 12),
-            _buildNotesField(),
-            const SizedBox(height: 32),
 
             // Submit Button
             _buildSubmitButton(),
@@ -552,52 +507,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.focus, width: 2),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGenderSelector() {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border, width: 1),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedGender,
-          isExpanded: true,
-          icon: Icon(
-            Icons.keyboard_arrow_down,
-            color: AppColors.primary,
-          ),
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textPrimary,
-          ),
-          hint: const Text(
-            'Select Gender',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          items: ['male', 'female', 'other'].map((String gender) {
-            return DropdownMenuItem<String>(
-              value: gender,
-              child: Text(
-                gender[0].toUpperCase() + gender.substring(1),
-              ),
-            );
-          }).toList(),
-          onChanged: (String? newValue) {
-            setState(() => _selectedGender = newValue);
-          },
         ),
       ),
     );
@@ -738,30 +647,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
     );
   }
 
-  Widget _buildNotesField() {
-    return TextField(
-      controller: _situationController,
-      maxLines: 3,
-      decoration: InputDecoration(
-        hintText: 'Add any additional notes about the emergency...',
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border, width: 1),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border, width: 1),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.focus, width: 2),
-        ),
-      ),
-    );
-  }
-
   Widget _buildLocationSection() {
     if (_selectedLocation != null) {
       return Container(
@@ -873,9 +758,7 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
 
   Widget _buildSubmitButton() {
     final isFormValid = _selectedBloodGroup != null &&
-        _selectedGender != null &&
         _patientNameController.text.isNotEmpty &&
-        _ageController.text.isNotEmpty &&
         _contactPhoneController.text.isNotEmpty &&
         _selectedLocation != null;
 
@@ -923,24 +806,12 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
 
     // Validate required fields
     if (_contactPhoneController.text.isEmpty ||
-        _patientNameController.text.isEmpty ||
-        _ageController.text.isEmpty) {
-      return;
-    }
-
-    // Validate gender
-    if (_selectedGender == null) {
+        _patientNameController.text.isEmpty) {
       return;
     }
 
     // Validate location
     if (_selectedLocation == null) {
-      return;
-    }
-
-    // Validate age
-    final age = int.tryParse(_ageController.text);
-    if (age == null || age < 0 || age > 120) {
       return;
     }
 
@@ -960,8 +831,6 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
         hospitalAddress: _selectedLocation!.fullAddress,
         contactPhone: phone,
         patientName: _patientNameController.text,
-        age: age,
-        gender: _selectedGender!,
         unitsNeeded: _unitsNeeded,
         hospitalLat: _selectedLocation!.latitude,
         hospitalLng: _selectedLocation!.longitude,
