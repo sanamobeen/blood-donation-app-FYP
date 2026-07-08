@@ -26,10 +26,16 @@ class SOSRequestSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'requester', 'status', 'responders_count', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'age': {'required': False, 'allow_null': True},
+            'gender': {'required': False, 'allow_null': True},
+        }
 
     def validate_age(self, value):
         """Validate age is reasonable"""
-        if value is not None and (value < 0 or value > 120):
+        if value is None:
+            return None
+        if value < 0 or value > 120:
             raise serializers.ValidationError("Please enter a valid age.")
         return value
 
