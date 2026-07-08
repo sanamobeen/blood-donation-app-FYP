@@ -392,7 +392,7 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
             const SizedBox(height: 20),
 
             // Hospital Location
-            _buildSectionTitle('Hospital Location*'),
+            _buildSectionTitle('Location*'),
             const SizedBox(height: 12),
             _buildLocationSection(),
             const SizedBox(height: 20),
@@ -724,7 +724,7 @@ class _SOSScreenApiState extends State<SOSScreenApi> {
             ),
             const SizedBox(width: 12),
             Text(
-              'Add Hospital Location',
+              'Add Location',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
