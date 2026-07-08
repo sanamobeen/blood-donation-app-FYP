@@ -323,6 +323,7 @@ def notify_nearby_users_sos_created(sos_request, radius_km: int = 50) -> int:
     data = {
         'type': 'sos_created',
         'sos_id': str(sos_request.id),
+        'patient_name': sos_request.patient_name or 'Patient',
         'blood_type': sos_request.blood_type,
         'hospital_name': sos_request.hospital_name,
         'units_needed': str(sos_request.units_needed),
@@ -331,8 +332,8 @@ def notify_nearby_users_sos_created(sos_request, radius_km: int = 50) -> int:
         'longitude': str(sos_request.hospital_lng),
     }
 
-    title = f"🆘 SOS: {sos_request.blood_type} Blood Needed!"
-    body = f"{sos_request.units_needed} unit(s) needed at {sos_request.hospital_name}. Please help if nearby."
+    title = f"🆘 Urgent Blood Request: {sos_request.patient_name or 'Patient'}"
+    body = f"{sos_request.blood_type} blood needed. {sos_request.units_needed} unit(s) needed at {sos_request.hospital_name}. Please help if nearby."
 
     return send_push_notification_to_multiple(
         tokens=tokens,
