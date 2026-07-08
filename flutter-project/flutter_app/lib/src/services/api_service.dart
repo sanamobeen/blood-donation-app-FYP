@@ -1395,8 +1395,8 @@ class ApiService {
     required String hospitalAddress,
     required String contactPhone,
     required String patientName,
-    required int age,
-    required String gender,
+    int? age,
+    String? gender,
     int unitsNeeded = 1,
     double? hospitalLat,
     double? hospitalLng,
@@ -1405,21 +1405,25 @@ class ApiService {
 
       final headers = await getAuthHeaders();
 
+      final body = {
+        'blood_type': bloodType,
+        'hospital_name': hospitalName,
+        'hospital_address': hospitalAddress,
+        'contact_phone': contactPhone,
+        'patient_name': patientName,
+        'units_needed': unitsNeeded,
+        if (hospitalLat != null) 'hospital_lat': hospitalLat,
+        if (hospitalLng != null) 'hospital_lng': hospitalLng,
+      };
+
+      // Only include age and gender if provided
+      if (age != null) body['age'] = age;
+      if (gender != null) body['gender'] = gender;
+
       final response = await http.post(
         Uri.parse('${ApiConfig.sosEndpoint}/'),
         headers: headers,
-        body: jsonEncode({
-          'blood_type': bloodType,
-          'hospital_name': hospitalName,
-          'hospital_address': hospitalAddress,
-          'contact_phone': contactPhone,
-          'patient_name': patientName,
-          'age': age,
-          'gender': gender,
-          'units_needed': unitsNeeded,
-          if (hospitalLat != null) 'hospital_lat': hospitalLat,
-          if (hospitalLng != null) 'hospital_lng': hospitalLng,
-        }),
+        body: jsonEncode(body),
       );
 
       final data = jsonDecode(response.body);
