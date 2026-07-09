@@ -633,20 +633,12 @@ class _PatientDonorManagementScreenState extends State<PatientDonorManagementScr
         );
 
         if (response['success'] == true) {
-          // Check if donation record was created
-          final donation = response['data']?['donation'];
-          final certificateNumber = donation?['certificate_number'];
-
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                certificateNumber != null
-                    ? 'Donation completed! Certificate: $certificateNumber'
-                    : 'Donation completed successfully!',
-              ),
+            const SnackBar(
+              content: Text('Donation completed successfully!'),
               backgroundColor: AppColors.online,
               behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 4),
+              duration: Duration(seconds: 4),
             ),
           );
           _loadPledgedDonors();

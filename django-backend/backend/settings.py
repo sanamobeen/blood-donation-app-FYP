@@ -67,7 +67,6 @@ INSTALLED_APPS = [
     'notifications',  # Push notifications via FCM
     # Phase 0: Production Infrastructure
     'channels',  # WebSocket support
-    'django_celery_beat',  # Celery Beat for scheduled tasks
     # Phase 8: Chat System
     'chat',  # Private messaging between patients and donors
     # AI Chatbot Assistant
@@ -246,13 +245,13 @@ SOS_NOTIFICATION_RADIUS_KM = env('SOS_NOTIFICATION_RADIUS_KM', default=50, cast=
 
 
 # Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='sanamobin7@gmail.com')
+EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = env('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = env('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='sanamobin7@gmail.com')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 # For development, you can use console backend to see emails in console
@@ -342,41 +341,13 @@ os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 # ASGI application for Django Channels
 ASGI_APPLICATION = 'backend.asgi.application'
 
-# Channel layers using Redis (PRODUCTION READY)
-# For development, you can use InMemoryChannelLayer but Redis is recommended
+# Channel layers using InMemory (no Redis required)
+# Suitable for development and single-server deployments
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [(os.environ.get('REDIS_HOST', '127.0.0.1'), 6379)],
-            "capacity": 1500,
-            "expiry": 10,
-        },
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
     },
 }
-
-# Celery Configuration for background tasks
-CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
-CELERY_ACCEPT_CONTENT = ['application/json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
-CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
-
-# Celery Beat Schedule for automatic tasks
-CELERY_BEAT_SCHEDULE = {
-    'expire-old-blood-requests': {
-        'task': 'blood_requests.tasks.expire_old_requests',
-        'schedule': 300.0,  # Run every 5 minutes
-    },
-    'cleanup-old-notifications': {
-        'task': 'notifications.tasks.cleanup_old_notifications',
-        'schedule': 86400.0,  # Run daily (24 hours)
-    },
-}
-
 
 # ===============================
 # LLM Configuration for AI Chatbot
@@ -413,7 +384,8 @@ try:
 
         if firebase_credentials_path and os.path.exists(firebase_credentials_path):
             cred = credentials.Certificate(firebase_credentials_path)
-            initialize_app(cred, options={'project_id': 'blood-donation-chat'})
+            firebase_project_id = os.environ.get('FIREBASE_PROJECT_ID', 'blood-donation-chat')
+            initialize_app(cred, options={'project_id': firebase_project_id})
             print("SUCCESS: Firebase Admin SDK initialized successfully")
         else:
             print("WARNING: Firebase credentials not found - FCM notifications will not work")

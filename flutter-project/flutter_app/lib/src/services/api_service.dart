@@ -1965,29 +1965,6 @@ class ApiService {
     }
   }
 
-  /// Get donation certificate
-  static Future<Map<String, dynamic>> getDonationCertificate(String donationId) async {
-    try {
-
-      final headers = await getAuthHeaders();
-
-      final response = await http.get(
-        Uri.parse('${ApiConfig.donationsEndpoint}/$donationId/certificate/'),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        // Return the response as is - certificate fields are at root level
-        return data;
-      } else {
-        return {'success': false, 'message': 'Failed to get certificate'};
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Network error: $e'};
-    }
-  }
-
   /// Get blood request responses (who donated)
   static Future<Map<String, dynamic>> getBloodRequestResponses(String requestId) async {
     try {

@@ -624,8 +624,11 @@ def respond_to_sos(request, sos_id):
     try:
         sos_request = SOSRequest.objects.get(id=sos_id)
 
+        logger.info(f"SOS Response attempt by {request.user.email} for SOS {sos_id} (status: {sos_request.status})")
+
         # Check if already responded
         if SOSResponse.objects.filter(sos_request=sos_request, responder=request.user).exists():
+            logger.warning(f"{request.user.email} already responded to SOS {sos_id}")
             return error_response(
                 message='You have already responded to this SOS request.',
                 status_code=status.HTTP_400_BAD_REQUEST
@@ -633,6 +636,7 @@ def respond_to_sos(request, sos_id):
 
         # Check if SOS is still active
         if sos_request.status != 'active':
+            logger.warning(f"SOS {sos_id} is not active (status: {sos_request.status})")
             return error_response(
                 message='This SOS request is no longer active.',
                 status_code=status.HTTP_400_BAD_REQUEST
@@ -914,6 +918,19 @@ def accept_sos_response(request, sos_id, response_id):
 
         logger.info(f"{request.user.email} accepted response from {response.responder.email} for SOS {sos_id}")
 
+        # Update the existing notification type to hide accept button
+        try:
+            from notifications.models import Notification
+            # Find the sos_response notification for this response and update its type
+            Notification.objects.filter(
+                user=sos_request.requester,
+                type='sos_response',
+                related_request_id=str(sos_request.id)
+            ).update(type='sos_response_accepted')
+            logger.info(f"Updated notification type to 'sos_response_accepted' for SOS {sos_id}")
+        except Exception as e:
+            logger.warning(f"Failed to update notification type: {str(e)}")
+
         # Notify the donor
         try:
             from notifications.services.fcm_service import notify_donor_sos_accepted
@@ -991,7 +1008,14 @@ def confirm_donation(request, sos_id, response_id):
         response.donated_at = timezone.now()
         response.save()
 
+        # Automatically resolve SOS when donation is confirmed
+        sos_request.status = 'resolved'
+        sos_request.resolved_at = timezone.now()
+        sos_request.resolution_notes = f'Donation confirmed from donor {response.responder.full_name or response.responder.email}'
+        sos_request.save()
+
         logger.info(f"{request.user.email} confirmed donation from {response.responder.email} for SOS {sos_id}")
+        logger.info(f"SOS {sos_id} automatically resolved after donation confirmation")
 
         # Notify the donor
         try:
@@ -1723,6 +1747,19 @@ def reject_sos_response(request, sos_id, response_id):
 
         logger.info(f"{request.user.email} rejected response from {response.responder.email} for SOS {sos_id}")
 
+        # Update the existing notification type to hide accept/decline buttons
+        try:
+            from notifications.models import Notification
+            # Find the sos_response notification for this response and update its type
+            Notification.objects.filter(
+                user=sos_request.requester,
+                type='sos_response',
+                related_request_id=str(sos_request.id)
+            ).update(type='sos_response_rejected')
+            logger.info(f"Updated notification type to 'sos_response_rejected' for SOS {sos_id}")
+        except Exception as e:
+            logger.warning(f"Failed to update notification type: {str(e)}")
+
         # Notify the donor
         try:
             from notifications.services.fcm_service import notify_donor_response_rejected
@@ -1754,5 +1791,131 @@ def reject_sos_response(request, sos_id, response_id):
         logger.error(f"Error rejecting response: {str(e)}", exc_info=True)
         return error_response(
             message='An error occurred while rejecting the response.',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def debug_sos_notifications(request):
+    """
+    Debug endpoint to check SOS notification configuration.
+
+    GET /api/sos/debug-notifications/
+
+    Response (200 OK):
+    {
+        "success": true,
+        "firebase_configured": true,
+        "donors_checked": 5,
+        "eligible_donors": [
+            {
+                "email": "donor@example.com",
+                "blood_group": "A+",
+                "has_fcm_token": true,
+                "has_location": true,
+                "distance_km": 5.2,
+                "is_eligible": true
+            }
+        ],
+        "issues": ["List of any issues found"]
+    }
+    """
+    try:
+        from account.models import UserProfile
+        from account.fcm_service import get_compatible_blood_types, calculate_distance
+        import firebase_admin
+
+        # Check if Firebase is configured
+        firebase_configured = len(firebase_admin._apps) > 0
+
+        # Get all donor profiles
+        donor_profiles = UserProfile.objects.filter(
+            user__role='donor',
+            user__is_active=True
+        ).select_related('user').all()
+
+        # Use hospital location from a recent SOS or use a test location
+        test_lat = float(request.query_params.get('lat', 31.5204))  # Default: Lahore
+        test_lng = float(request.query_params.get('lng', 74.3587))
+        test_blood_type = request.query_params.get('blood_type', 'A+')
+
+        # Get compatible blood types
+        compatible_types = get_compatible_blood_types(test_blood_type)
+
+        eligible_donors = []
+        all_donors_info = []
+        issues = []
+
+        for donor in donor_profiles:
+            donor_info = {
+                'email': donor.user.email,
+                'blood_group': donor.blood_group,
+                'has_fcm_token': bool(donor.fcm_token),
+                'has_location': bool(donor.location_lat and donor.location_lng),
+                'fcm_token_preview': donor.fcm_token[:20] + '...' if donor.fcm_token else None,
+                'distance_km': None,
+                'is_eligible': False,
+                'issues': []
+            }
+
+            # Check blood type compatibility
+            if donor.blood_group not in compatible_types:
+                donor_info['issues'].append(f'Blood type {donor.blood_group} not compatible with {test_blood_type}')
+                issues.append(f"{donor.user.email}: Incompatible blood type")
+            elif donor.blood_group is None:
+                donor_info['issues'].append('No blood group set')
+                issues.append(f"{donor.user.email}: No blood group set")
+
+            # Check FCM token
+            if not donor.fcm_token:
+                donor_info['issues'].append('No FCM token registered')
+                issues.append(f"{donor.user.email}: No FCM token")
+
+            # Check location
+            if not donor.location_lat or not donor.location_lng:
+                donor_info['issues'].append('No location set')
+                issues.append(f"{donor.user.email}: No location set")
+            else:
+                # Calculate distance
+                distance = calculate_distance(
+                    float(donor.location_lat),
+                    float(donor.location_lng),
+                    test_lat, test_lng
+                )
+                donor_info['distance_km'] = round(distance, 2)
+
+                if distance > 50:
+                    donor_info['issues'].append(f'Outside 50km radius ({distance:.1f}km)')
+                    issues.append(f"{donor.user.email}: Outside radius")
+
+            # Determine eligibility
+            donor_info['is_eligible'] = len(donor_info['issues']) == 0
+            if donor_info['is_eligible']:
+                eligible_donors.append(donor_info)
+
+            all_donors_info.append(donor_info)
+
+        return success_response(
+            message='Debug information retrieved',
+            data={
+                'firebase_configured': firebase_configured,
+                'test_parameters': {
+                    'hospital_location': {'lat': test_lat, 'lng': test_lng},
+                    'blood_type': test_blood_type,
+                    'compatible_blood_types': compatible_types,
+                    'radius_km': 50
+                },
+                'donors_checked': len(donor_profiles),
+                'eligible_donors': eligible_donors,
+                'all_donors': all_donors_info,
+                'issues': issues
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error in debug endpoint: {str(e)}", exc_info=True)
+        return error_response(
+            message=f'Debug error: {str(e)}',
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

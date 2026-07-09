@@ -63,7 +63,8 @@ def get_fcm_app():
                 cred = None
 
             if cred:
-                _fcm_app = firebase_admin.initialize_app(cred, options={'project_id': 'blood-donation-chat'})
+                firebase_project_id = os.environ.get('FIREBASE_PROJECT_ID', 'blood-donation-chat')
+                _fcm_app = firebase_admin.initialize_app(cred, options={'project_id': firebase_project_id})
                 logger.info("Firebase Admin SDK initialized successfully in fcm_service")
             else:
                 # Initialize without credentials (for development only)

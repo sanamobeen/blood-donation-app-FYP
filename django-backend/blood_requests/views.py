@@ -2131,15 +2131,6 @@ def confirm_donation(request, request_id, pledge_id):
 
             logger.info(f"Donation record created: {donation.id} for pledge {pledge_id}")
 
-            # Generate certificate number
-            try:
-                donation.generate_certificate_number()
-                donation.certificate_issued = True
-                donation.save()
-                logger.info(f"Certificate generated: {donation.certificate_number}")
-            except Exception as cert_error:
-                logger.warning(f"Failed to generate certificate: {cert_error}")
-
         except ImportError:
             logger.warning("Donations app not available - skipping donation record creation")
         except Exception as donation_error:
@@ -2320,18 +2311,8 @@ def complete_pledge_donation(request, request_id, pledge_id):
 
                 logger.info(f"Donation record created: {donation.id} for pledge {pledge_id}")
 
-                # Generate certificate number
-                try:
-                    donation.generate_certificate_number()
-                    donation.certificate_issued = True
-                    donation.save()
-                    logger.info(f"Certificate generated: {donation.certificate_number}")
-                except Exception as cert_error:
-                    logger.warning(f"Failed to generate certificate: {cert_error}")
-
                 donation_data = {
                     'id': str(donation.id),
-                    'certificate_number': donation.certificate_number,
                     'units': donation.units,
                     'donation_date': donation.donation_date.isoformat(),
                 }

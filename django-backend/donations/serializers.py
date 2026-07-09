@@ -39,8 +39,6 @@ class DonationSerializer(serializers.ModelSerializer):
             'blood_pressure',
             'health_status',
             'notes',
-            'certificate_number',
-            'certificate_issued',
             'acknowledged_by_patient',
             'acknowledged_at',
             'is_fulfilled',
