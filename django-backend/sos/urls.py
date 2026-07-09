@@ -9,6 +9,9 @@ from . import views
 app_name = 'sos'
 
 urlpatterns = [
+    # Debug endpoint
+    path('debug-notifications/', views.debug_sos_notifications, name='debug_sos_notifications'),
+
     # SOS endpoints
     path('', views.create_sos, name='create_sos'),
     path('active/', views.list_active_sos, name='list_active_sos'),

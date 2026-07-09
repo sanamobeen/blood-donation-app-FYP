@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../models/donation_response.dart';
-import 'donation_certificate_screen.dart';
 import '../../utils/string_extensions.dart';
 
 class MyDonationsScreen extends StatefulWidget {
@@ -305,11 +304,6 @@ class _MyDonationsScreenState extends State<MyDonationsScreen> {
             value: '$_totalUnits',
             label: 'Units Donated',
           ),
-          _buildSummaryItem(
-            icon: Icons.card_giftcard,
-            value: '${_donations.where((d) => d.certificateIssued).length}',
-            label: 'Certificates',
-          ),
         ],
       ),
     );
@@ -356,25 +350,7 @@ class _MyDonationsScreenState extends State<MyDonationsScreen> {
           return _DonationTimelineItem(
             donation: donation,
             formatDate: _formatDate,
-            onTap: () {
-              if (donation.certificateIssued && donation.certificateNumber != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DonationCertificateScreen(
-                      donationId: donation.id,
-                    ),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Certificate not yet available'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            },
+            onTap: null,
           );
         }).toList(),
       ),
@@ -385,22 +361,19 @@ class _MyDonationsScreenState extends State<MyDonationsScreen> {
 class _DonationTimelineItem extends StatelessWidget {
   final DonationResponse donation;
   final String Function(String) formatDate;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _DonationTimelineItem({
     required this.donation,
     required this.formatDate,
-    required this.onTap,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(donation);
-    final hasCertificate = donation.certificateIssued && donation.certificateNumber != null;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -521,52 +494,11 @@ class _DonationTimelineItem extends StatelessWidget {
                       ],
                     ],
                   ),
-                  if (donation.certificateNumber != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Certificate: ${donation.certificateNumber}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
-
-            // Certificate/Download Icon
-            if (hasCertificate)
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0F0),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.card_membership,
-                  color: AppColors.primary,
-                  size: 18,
-                ),
-              )
-            else
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.pending,
-                  color: Colors.grey.shade400,
-                  size: 18,
-                ),
-              ),
           ],
         ),
-      ),
     );
   }
 

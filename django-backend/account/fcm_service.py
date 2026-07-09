@@ -63,7 +63,8 @@ def get_fcm_app():
                 cred = None
 
             if cred:
-                _fcm_app = firebase_admin.initialize_app(cred, options={'project_id': 'blood-donation-chat'})
+                firebase_project_id = os.environ.get('FIREBASE_PROJECT_ID', 'blood-donation-chat')
+                _fcm_app = firebase_admin.initialize_app(cred, options={'project_id': firebase_project_id})
                 logger.info("Firebase Admin SDK initialized successfully in fcm_service")
             else:
                 # Initialize without credentials (for development only)
@@ -225,24 +226,28 @@ def send_to_multicast(
 
 def send_sos_notification(
     registration_token: str,
+    patient_name: str,
     blood_type: str,
     hospital_name: str,
     hospital_address: str,
     distance_km: float,
     sos_id: str,
     urgency: str = "critical",
+    created_at: str = None,
 ) -> bool:
     """
     Send an SOS notification to a single donor.
 
     Args:
         registration_token: FCM device token
+        patient_name: Name of the patient needing blood
         blood_type: Required blood type
         hospital_name: Hospital name
         hospital_address: Hospital address
         distance_km: Distance from donor to hospital
         sos_id: SOS alert ID
         urgency: Urgency level (critical, urgent, normal)
+        created_at: When SOS was created (ISO format string)
 
     Returns:
         bool: True if successful, False otherwise
@@ -254,17 +259,32 @@ def send_sos_notification(
         'normal': '📍'
     }
 
-    title = f"{urgency_emoji.get(urgency, '🩸')} URGENT: Blood Needed!"
-    body = f"{blood_type} blood needed at {hospital_name}\nOnly {distance_km:.1f}km away"
+    # Format notification title with patient name
+    title = f"{urgency_emoji.get(urgency, '🩸')} Urgent Blood Request: {patient_name}"
+
+    # Format notification body with all details
+    body_parts = [
+        f"🩸 {blood_type} blood needed",
+        f"📍 {distance_km:.1f}km away",
+        f"🏥 {hospital_name}",
+    ]
+
+    # Add creation time if provided
+    if created_at:
+        body_parts.append(f"⏰ {created_at}")
+
+    body = "\n".join(body_parts)
 
     data = {
         'type': 'sos_alert',
         'sos_id': sos_id,
+        'patient_name': patient_name,
         'blood_type': blood_type,
         'hospital_name': hospital_name,
         'hospital_address': hospital_address,
         'distance_km': str(distance_km),
         'urgency': urgency,
+        'created_at': created_at or '',
         'action': 'respond',
         'click_action': 'FLUTTER_NOTIFICATION_CLICK',
         'sound': 'alarm',
@@ -288,9 +308,14 @@ def send_batch_sos_notifications(
     sos_id: str,
     urgency: str = "critical",
     donor_distances: Optional[Dict[str, float]] = None,
+    patient_name: str = "Patient",
+    created_at: str = None,
 ) -> Dict[str, Any]:
     """
-    Send SOS notifications to multiple donors.
+    Send SOS notifications to multiple donors with individualized information.
+
+    Each donor receives a personalized notification showing their specific distance
+    to the patient and all relevant patient information.
 
     Args:
         donor_tokens: List of FCM tokens for eligible donors
@@ -299,11 +324,15 @@ def send_batch_sos_notifications(
         hospital_address: Hospital address
         sos_id: SOS alert ID
         urgency: Urgency level
-        donor_distances: Optional dict mapping token to distance in km
+        donor_distances: Dict mapping token to distance in km for each donor
+        patient_name: Name of the patient needing blood
+        created_at: When SOS was created (ISO format string)
 
     Returns:
         dict: Response with success/failure counts
     """
+    from datetime import datetime
+
     if not donor_tokens:
         return {
             'success_count': 0,
@@ -318,80 +347,95 @@ def send_batch_sos_notifications(
         'normal': '🩸'
     }
 
-    # Create a single notification for all recipients
-    # Note: MulticastMessage uses one notification for all tokens
-    urgency_emoji = {
-        'critical': '🚨',
-        'urgent': '⚠️',
-        'normal': '🩸'
+    success_count = 0
+    failure_count = 0
+    failed_tokens = []
+
+    # Format the creation time for display
+    created_time_str = ""
+    if created_at:
+        try:
+            dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            created_time_str = dt.strftime('%H:%M')  # Just show time
+        except:
+            created_time_str = ""
+
+    # Send individual notification to each donor
+    for token in donor_tokens:
+        try:
+            # Get distance for this specific donor
+            distance_km = donor_distances.get(token, 0.0) if donor_distances else 0.0
+
+            # Create personalized title with patient name
+            title = f"{urgency_emoji.get(urgency, '🩸')} Urgent Blood Request: {patient_name}"
+
+            # Create personalized body with all details
+            body_parts = [
+                f"🩸 {blood_type} blood needed",
+                f"📍 {distance_km:.1f}km away",
+                f"🏥 {hospital_name}",
+            ]
+
+            # Add creation time if available
+            if created_time_str:
+                body_parts.append(f"⏰ Requested at {created_time_str}")
+
+            body = "\n".join(body_parts)
+
+            # Create data payload with all patient information
+            data = {
+                'type': 'sos_alert',
+                'sos_id': sos_id,
+                'patient_name': patient_name,
+                'blood_type': blood_type,
+                'hospital_name': hospital_name,
+                'hospital_address': hospital_address,
+                'distance_km': str(distance_km),
+                'urgency': urgency,
+                'created_at': created_at or '',
+                'action': 'respond',
+                'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+            }
+
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title=title,
+                    body=body,
+                ),
+                data=data,
+                android=messaging.AndroidConfig(
+                    notification=messaging.AndroidNotification(
+                        channel_id='sos_critical',
+                        sound='alarm',
+                        priority='high',
+                    ),
+                    priority='high',
+                ),
+                token=token,
+            )
+
+            # Send the message
+            messaging.send(message, app=get_fcm_app())
+            success_count += 1
+            logger.info(f"SOS notification sent to donor at {distance_km:.1f}km")
+
+        except exceptions.InvalidArgumentError as e:
+            logger.error(f"Invalid FCM token {token[:20]}...: {str(e)}")
+            failure_count += 1
+            failed_tokens.append(token)
+        except Exception as e:
+            logger.error(f"Failed to send SOS notification to {token[:20]}...: {str(e)}")
+            failure_count += 1
+            failed_tokens.append(token)
+
+    logger.info(f"SOS batch notification sent: {success_count} success, {failure_count} failed")
+
+    return {
+        'success_count': success_count,
+        'failure_count': failure_count,
+        'failed_tokens': failed_tokens,
+        'total_tokens': len(donor_tokens)
     }
-
-    # Get average distance for notification body
-    avg_distance = 0.0
-    if donor_distances:
-        distances = list(donor_distances.values())
-        if distances:
-            avg_distance = sum(distances) / len(distances)
-
-    if avg_distance > 0:
-        body = f"{blood_type} blood needed at {hospital_name}\nWithin {avg_distance:.1f}km"
-    else:
-        body = f"{blood_type} blood needed at {hospital_name}\nNear your location"
-
-    message = messaging.MulticastMessage(
-        notification=messaging.Notification(
-            title=f"{urgency_emoji.get(urgency, '🩸')} URGENT: Blood Needed!",
-            body=body,
-        ),
-        data={
-            'type': 'sos_alert',
-            'sos_id': sos_id,
-            'blood_type': blood_type,
-            'hospital_name': hospital_name,
-            'hospital_address': hospital_address,
-            'urgency': urgency,
-            'action': 'respond',
-            'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-        },
-        android=messaging.AndroidConfig(
-            notification=messaging.AndroidNotification(
-                channel_id='sos_critical',
-                sound='alarm',
-            ),
-            priority='high',
-        ),
-        tokens=donor_tokens,
-    )
-
-    try:
-        batch_response = messaging.send_each_for_multicast(message, app=get_fcm_app())
-
-        success_count = batch_response.success_count
-        failure_count = batch_response.failure_count
-
-        failed_tokens = []
-        if hasattr(batch_response, 'responses'):
-            for idx, response in enumerate(batch_response.responses):
-                if not response.success:
-                    failed_tokens.append(donor_tokens[idx])
-
-        logger.info(f"SOS batch notification sent: {success_count} success, {failure_count} failed")
-
-        return {
-            'success_count': success_count,
-            'failure_count': failure_count,
-            'failed_tokens': failed_tokens,
-            'total_tokens': len(donor_tokens)
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to send batch SOS notifications: {str(e)}")
-        return {
-            'success_count': 0,
-            'failure_count': len(donor_tokens),
-            'failed_tokens': donor_tokens,
-            'total_tokens': len(donor_tokens)
-        }
 
 
 def validate_fcm_token(token: str) -> bool:

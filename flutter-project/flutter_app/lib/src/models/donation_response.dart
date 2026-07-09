@@ -14,8 +14,6 @@ class DonationResponse {
   final int units;
   final String donationDate;
   final String? donationCenter;
-  final String? certificateNumber;
-  final bool certificateIssued;
   final bool acknowledgedByPatient;
   final String? acknowledgedAt;
   final bool isFulfilled;
@@ -34,8 +32,6 @@ class DonationResponse {
     required this.units,
     required this.donationDate,
     this.donationCenter,
-    this.certificateNumber,
-    required this.certificateIssued,
     required this.acknowledgedByPatient,
     this.acknowledgedAt,
     required this.isFulfilled,
@@ -56,8 +52,6 @@ class DonationResponse {
       units: json['units'] as int? ?? 0,
       donationDate: json['donation_date'] as String? ?? '',
       donationCenter: json['donation_center'] as String?,
-      certificateNumber: json['certificate_number'] as String?,
-      certificateIssued: json['certificate_issued'] as bool? ?? false,
       acknowledgedByPatient: json['acknowledged_by_patient'] as bool? ?? false,
       acknowledgedAt: json['acknowledged_at'] as String?,
       isFulfilled: json['is_fulfilled'] as bool? ?? false,
@@ -78,58 +72,6 @@ class DonationResponse {
     if (isFulfilled) return '#2A9D8F';
     if (acknowledgedByPatient) return '#E9C46A';
     return '#6C757D';
-  }
-}
-
-/// Donation Certificate
-class DonationCertificate {
-  final String certificateNumber;
-  final String donationNumber;
-  final String donationDate;
-  final String donorName;
-  final String? bloodType;
-  final int units;
-  final String recipient;
-  final String? issuedAt;
-
-  DonationCertificate({
-    required this.certificateNumber,
-    required this.donationNumber,
-    required this.donationDate,
-    required this.donorName,
-    this.bloodType,
-    required this.units,
-    required this.recipient,
-    this.issuedAt,
-  });
-
-  factory DonationCertificate.fromJson(Map<String, dynamic> json) {
-    return DonationCertificate(
-      certificateNumber: json['certificate_number'] as String? ?? '',
-      donationNumber: json['donation_number'] as String? ?? '',
-      donationDate: json['donation_date'] as String? ?? '',
-      donorName: json['donor_name'] as String? ?? '',
-      bloodType: json['blood_type'] as String?,
-      units: json['units'] as int? ?? 0,
-      recipient: json['recipient'] as String? ?? '',
-      issuedAt: json['issued_at'] as String?,
-    );
-  }
-
-  /// Get formatted certificate text
-  String get certificateText {
-    return '''
-CERTIFICATE OF APPRECIATION
-
-This certifies that $donorName
-has donated $units unit${units > 1 ? 's' : ''} of blood${bloodType != null ? ' ($bloodType)' : ''}
-
-Donation Date: $donationDate
-Recipient: $recipient
-Certificate No: $certificateNumber
-
-Thank you for saving lives!
-''';
   }
 }
 

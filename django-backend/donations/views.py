@@ -272,8 +272,7 @@ def acknowledge_donation(request, donation_id):
         "success": true,
         "message": "Donation acknowledged",
         "data": {
-            "donation": {...},
-            "certificate_number": "DN-2024-ABC123"
+            "donation": {...}
         }
     }
     """
@@ -297,12 +296,6 @@ def acknowledge_donation(request, donation_id):
         # Acknowledge the donation
         donation.acknowledged_by_patient = True
         donation.acknowledged_at = timezone.now()
-
-        # Generate certificate number
-        certificate_number = donation.generate_certificate_number()
-
-        # Mark certificate as issued
-        donation.certificate_issued = True
         donation.save()
 
         logger.info(f"Donation {donation_id} acknowledged by {request.user.email}")
@@ -366,8 +359,7 @@ def acknowledge_donation(request, donation_id):
         return success_response(
             message='Donation acknowledged successfully. Thank you for confirming!',
             data={
-                'donation': serializer.data,
-                'certificate_number': certificate_number
+                'donation': serializer.data
             }
         )
 
@@ -380,84 +372,6 @@ def acknowledge_donation(request, donation_id):
         logger.error(f"Error acknowledging donation: {str(e)}", exc_info=True)
         return error_response(
             message='Failed to acknowledge donation.',
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def donation_certificate(request, donation_id):
-    """
-    Get donation certificate.
-
-    GET /api/donations/{id}/certificate
-
-    Headers:
-    Authorization: Bearer <access_token>
-
-    Response (200 OK):
-    {
-        "success": true,
-        "message": "Certificate generated",
-        "data": {
-            "certificate_number": "DN-2024-ABC123",
-            "donation_number": "DN-2024-0001",
-            "donation_date": "2024-06-05",
-            "donor_name": "John Doe",
-            "units": 1,
-            "recipient": "On behalf of City Hospital",
-            "issued_at": "2024-06-05T10:00:00Z"
-        }
-    }
-    """
-    try:
-        donation = Donation.objects.get(id=donation_id)
-
-        # Check if user owns this donation
-        if donation.donor != request.user:
-            return error_response(
-                message='You can only view your own donation certificates.',
-                status_code=status.HTTP_403_FORBIDDEN
-            )
-
-        # Check if donation is acknowledged
-        if not donation.acknowledged_by_patient:
-            return error_response(
-                message='Certificate is only available after patient acknowledges the donation.',
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Generate certificate number if not exists
-        if not donation.certificate_number:
-            donation.generate_certificate_number()
-            donation.save()
-
-        # Get patient name as recipient
-        recipient = donation.blood_request.patient_name if donation.blood_request else 'Unknown Recipient'
-
-        return success_response(
-            message='Certificate retrieved successfully.',
-            data={
-                'certificate_number': donation.certificate_number,
-                'donation_number': donation.certificate_number,
-                'donation_date': donation.donation_date,
-                'donor_name': request.user.get_full_name(),
-                'blood_type': donation.blood_type_code if donation.blood_type else None,
-                'units': donation.units,
-                'recipient': recipient,
-                'issued_at': donation.acknowledged_at
-            }
-        )
-
-    except Donation.DoesNotExist:
-        return error_response(
-            message='Donation not found.',
-            status_code=status.HTTP_404_NOT_FOUND
-        )
-    except Exception as e:
-        logger.error(f"Error generating certificate: {str(e)}", exc_info=True)
-        return error_response(
-            message='Failed to generate certificate.',
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 

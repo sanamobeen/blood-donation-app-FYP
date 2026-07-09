@@ -15,7 +15,9 @@ class OpenRouterLLMService:
 
     def __init__(self):
         self.api_key = os.environ.get('OPENROUTER_API_KEY')
-        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.api_url = os.environ.get('OPENROUTER_API_URL', 'https://openrouter.ai/api/v1/chat/completions')
+        self.referer_url = os.environ.get('OPENROUTER_REFERER_URL', 'https://blood-donation-app.com')
+        self.app_title = os.environ.get('OPENROUTER_APP_TITLE', 'Blood Donation App')
 
         if not self.api_key:
             raise ValueError("OPENROUTER_API_KEY environment variable not set")
@@ -84,8 +86,8 @@ Keep your responses:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
-            "HTTP-Referer": "https://blood-donation-app.com",
-            "X-Title": "Blood Donation App"
+            "HTTP-Referer": self.referer_url,
+            "X-Title": self.app_title
         }
 
         payload = {
@@ -167,8 +169,8 @@ Keep your responses:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
-            "HTTP-Referer": "https://blood-donation-app.com",
-            "X-Title": "Blood Donation App"
+            "HTTP-Referer": self.referer_url,
+            "X-Title": self.app_title
         }
 
         payload = {

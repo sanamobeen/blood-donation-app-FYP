@@ -70,12 +70,16 @@ class SOSRequest(models.Model):
         help_text="Name of the patient"
     )
     age = models.PositiveIntegerField(
-        help_text="Age of the patient"
+        null=True,
+        blank=True,
+        help_text="Age of the patient (optional)"
     )
     gender = models.CharField(
         max_length=20,
         choices=GENDER_CHOICES,
-        help_text="Gender of the patient"
+        null=True,
+        blank=True,
+        help_text="Gender of the patient (optional)"
     )
 
     # Hospital information
