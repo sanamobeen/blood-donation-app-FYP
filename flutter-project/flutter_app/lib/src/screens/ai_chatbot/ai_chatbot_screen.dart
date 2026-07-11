@@ -178,7 +178,7 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Blood Donation AI',
+                  'Blood Donor AI',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -259,7 +259,7 @@ class _AIChatbotScreenState extends State<AIChatbotScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Blood Donation Assistant',
+            'Blood Donor Assistant',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,

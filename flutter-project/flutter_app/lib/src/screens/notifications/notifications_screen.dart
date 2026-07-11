@@ -173,7 +173,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Back button
           GestureDetector(
@@ -193,7 +192,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
           ),
 
-          // Title
+          const SizedBox(width: 16),
+
+          // Title on the left
           const Text(
             'Notifications',
             style: TextStyle(
@@ -202,26 +203,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               color: AppColors.textPrimary,
             ),
           ),
-
-          // Settings icon
-          GestureDetector(
-            onTap: () {
-              // Navigate to notification settings
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.softPink.withValues(alpha: 0.5),
-              ),
-              child: const Icon(
-                Icons.settings,
-                color: AppColors.primary,
-                size: 22,
-              ),
-            ),
-          ),
+        ],
+      ),
+    );
+  }
         ],
       ),
     );
