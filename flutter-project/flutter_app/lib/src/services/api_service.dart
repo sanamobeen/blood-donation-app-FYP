@@ -640,6 +640,19 @@ class ApiService {
     }
   }
 
+  /// Format DateTime to ISO8601 string with timezone offset
+  /// This ensures the backend receives timezone-aware datetime
+  static String _formatDateTimeWithTimezone(DateTime dateTime) {
+    final duration = dateTime.timeZoneOffset;
+    final hours = duration.inHours.abs();
+    final minutes = duration.inMinutes.abs() - (hours * 60);
+    final sign = duration.isNegative ? '-' : '+';
+
+    // Format: 2024-07-11T21:41:00+05:00
+    final offset = '${sign}${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+    return '${dateTime.toIso8601String()}$offset';
+  }
+
   /// Create a new blood request (public endpoint)
   static Future<Map<String, dynamic>> createBloodRequest({
     required String patientName,
@@ -660,7 +673,7 @@ class ApiService {
       final headers = await getAuthHeaders();
 
       // Debug: Log the needed_by value being sent
-      print('🐛 [createBloodRequest] Sending needed_by: ${neededBy.toIso8601String()}');
+      print('🐛 [createBloodRequest] Sending needed_by: ${_formatDateTimeWithTimezone(neededBy)}');
       print('🐛 [createBloodRequest] Original DateTime: $neededBy');
 
       final response = await http.post(
@@ -677,7 +690,8 @@ class ApiService {
           if (additionalNotes != null && additionalNotes.isNotEmpty) 'additional_notes': additionalNotes,
           if (locationLat != null && locationLng != null) 'location_lat': locationLat,
           if (locationLat != null && locationLng != null) 'location_lng': locationLng,
-          if (neededBy != null) 'needed_by': neededBy.toIso8601String(),
+          // Send datetime with timezone info to avoid timezone issues
+          if (neededBy != null) 'needed_by': _formatDateTimeWithTimezone(neededBy),
           if (quizResponses != null) 'quiz_responses': quizResponses,
         }),
       );
