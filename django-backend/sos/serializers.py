@@ -26,9 +26,15 @@ class SOSRequestSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'requester', 'status', 'responders_count', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'age': {'required': False, 'allow_null': True},
+            'gender': {'required': False, 'allow_null': True},
+        }
 
     def validate_age(self, value):
         """Validate age is reasonable"""
+        if value is None:
+            return None
         if value < 0 or value > 120:
             raise serializers.ValidationError("Please enter a valid age.")
         return value
@@ -75,14 +81,14 @@ class SOSResponseSerializer(serializers.ModelSerializer):
     responder_email = serializers.EmailField(source='responder.email', read_only=True)
     responder_id = serializers.UUIDField(source='responder.id', read_only=True)
     donor_lat = serializers.DecimalField(
-        source='responder.profile.lat',
+        source='responder.profile.location_lat',
         read_only=True,
         allow_null=True,
         max_digits=10,
         decimal_places=7
     )
     donor_lng = serializers.DecimalField(
-        source='responder.profile.lng',
+        source='responder.profile.location_lng',
         read_only=True,
         allow_null=True,
         max_digits=10,

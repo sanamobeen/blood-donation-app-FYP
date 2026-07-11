@@ -1,9 +1,3 @@
 """
-Celery app initialization for Blood Donation Backend.
-
-This ensures that the Celery app is always imported when
-Django starts so that shared_task will use this app.
+Blood Donation Backend initialization.
 """
-from .celery import app as celery_app
-
-__all__ = ('celery_app',)

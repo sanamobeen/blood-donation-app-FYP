@@ -11,6 +11,7 @@ Provides endpoints for:
 import logging
 from datetime import timedelta
 from django.utils import timezone
+from django.conf import settings
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -175,7 +176,9 @@ def notify_donors(request):
             hospital_address=hospital_address,
             sos_id=notification_id,
             urgency=urgency_level,
-            donor_distances=donor_distances
+            donor_distances=donor_distances,
+            patient_name=patient_name or 'Patient',
+            created_at=timezone.now().isoformat(),
         )
 
         logger.info(f"SOS [{notification_id}]: Sent {notification_result['success_count']} notifications, "
@@ -186,17 +189,19 @@ def notify_donors(request):
             if donor.fcm_token in unique_tokens:
                 Notification.objects.create(
                     user=donor.user,
-                    title=f'🚨 URGENT: {blood_type} Blood Needed!',
+                    title=f'🚨 Urgent Blood Request: {patient_name or "Patient"}',
                     message=f'{blood_type} blood needed at {hospital_name}. Only {donor_distances.get(donor.fcm_token, 0):.1f}km away.',
                     type='sos_alert',
                     related_request_id=notification_id,
                     data={
                         'sos_id': notification_id,
+                        'patient_name': patient_name or 'Patient',
                         'blood_type': blood_type,
                         'hospital_name': hospital_name,
                         'hospital_address': hospital_address,
                         'distance_km': donor_distances.get(donor.fcm_token, 0),
                         'urgency': urgency_level,
+                        'created_at': timezone.now().isoformat(),
                     }
                 )
                 logger.info(f"Created in-app notification for donor {donor.user.email}")
@@ -326,7 +331,9 @@ def create_sos(request):
                         hospital_address=sos_request.hospital_address,
                         sos_id=str(sos_request.id),
                         urgency='critical',
-                        donor_distances={d['fcm_token']: d['distance'] for d in eligible_donors}
+                        donor_distances={d['fcm_token']: d['distance'] for d in eligible_donors},
+                        patient_name=sos_request.patient_name or 'Patient',
+                        created_at=sos_request.created_at.isoformat(),
                     )
                     success_count = notification_result.get('success_count', 0)
                     logger.info(f"Sent {success_count} SOS notifications to nearby donors")
@@ -336,17 +343,19 @@ def create_sos(request):
                         donor_profile = donor_data['profile']
                         Notification.objects.create(
                             user=donor_profile.user,
-                            title=f'🚨 URGENT: {sos_request.blood_type} Blood Needed!',
+                            title=f'🚨 Urgent Blood Request: {sos_request.patient_name or "Patient"}',
                             message=f'{sos_request.blood_type} blood needed at {sos_request.hospital_name}. Only {donor_data["distance"]:.1f}km away.',
                             type='sos_alert',
                             related_request_id=str(sos_request.id),
                             data={
                                 'sos_id': str(sos_request.id),
+                                'patient_name': sos_request.patient_name or 'Patient',
                                 'blood_type': sos_request.blood_type,
                                 'hospital_name': sos_request.hospital_name,
                                 'hospital_address': sos_request.hospital_address,
                                 'distance_km': donor_data['distance'],
                                 'urgency': 'critical',
+                                'created_at': sos_request.created_at.isoformat(),
                             }
                         )
                         logger.info(f"Created in-app notification for donor {donor_profile.user.email}")
@@ -616,8 +625,11 @@ def respond_to_sos(request, sos_id):
     try:
         sos_request = SOSRequest.objects.get(id=sos_id)
 
+        logger.info(f"SOS Response attempt by {request.user.email} for SOS {sos_id} (status: {sos_request.status})")
+
         # Check if already responded
         if SOSResponse.objects.filter(sos_request=sos_request, responder=request.user).exists():
+            logger.warning(f"{request.user.email} already responded to SOS {sos_id}")
             return error_response(
                 message='You have already responded to this SOS request.',
                 status_code=status.HTTP_400_BAD_REQUEST
@@ -625,6 +637,7 @@ def respond_to_sos(request, sos_id):
 
         # Check if SOS is still active
         if sos_request.status != 'active':
+            logger.warning(f"SOS {sos_id} is not active (status: {sos_request.status})")
             return error_response(
                 message='This SOS request is no longer active.',
                 status_code=status.HTTP_400_BAD_REQUEST
@@ -906,6 +919,19 @@ def accept_sos_response(request, sos_id, response_id):
 
         logger.info(f"{request.user.email} accepted response from {response.responder.email} for SOS {sos_id}")
 
+        # Update the existing notification type to hide accept button
+        try:
+            from notifications.models import Notification
+            # Find the sos_response notification for this response and update its type
+            Notification.objects.filter(
+                user=sos_request.requester,
+                type='sos_response',
+                related_request_id=str(sos_request.id)
+            ).update(type='sos_response_accepted')
+            logger.info(f"Updated notification type to 'sos_response_accepted' for SOS {sos_id}")
+        except Exception as e:
+            logger.warning(f"Failed to update notification type: {str(e)}")
+
         # Notify the donor
         try:
             from notifications.services.fcm_service import notify_donor_sos_accepted
@@ -956,7 +982,7 @@ def confirm_donation(request, sos_id, response_id):
     Response (200 OK):
     {
         "success": true,
-        "message": "Donation confirmed",
+        "message": "Donation confirmed and recorded",
         "data": {
             "response": {
                 "id": "uuid",
@@ -985,15 +1011,78 @@ def confirm_donation(request, sos_id, response_id):
 
         logger.info(f"{request.user.email} confirmed donation from {response.responder.email} for SOS {sos_id}")
 
-        # Notify the donor
+        # Create donation record for donor history
+        try:
+            from donations.models import Donation
+            from donations.serializers import DonationSerializer
+
+            # Create donation record
+            donation = Donation.objects.create(
+                donor=response.responder,
+                donor_name=response.responder.full_name or response.responder.email,
+                donor_email=response.responder.email,
+                blood_request=None,  # SOS doesn't link to blood_requests
+                hospital_name=sos_request.hospital_name,
+                patient_name=sos_request.requester.full_name or sos_request.requester.email,
+                blood_type=response.responder.profile.blood_group if hasattr(response.responder, 'profile') else None,
+                blood_type_code=response.blood_type,
+                units=1,  # Default 1 unit per SOS donation
+                donation_date=response.donated_at.date() if response.donated_at else timezone.now().date(),
+                donation_center=sos_request.hospital_name,
+                acknowledged_by_patient=True,  # Auto-acknowledge since patient confirmed
+                acknowledged_at=timezone.now(),
+                is_fulfilled=True
+            )
+
+            logger.info(f"Created donation record {donation.id} for donor {response.responder.email}")
+
+            # Update donor profile total_donations
+            try:
+                from account.models import UserProfile
+                user_profile = UserProfile.objects.filter(user=response.responder).first()
+                if user_profile:
+                    user_profile.total_donations += 1
+                    user_profile.last_donation = donation.donation_date
+                    user_profile.save()
+                    logger.info(f"Updated donor profile: total_donations={user_profile.total_donations}")
+            except Exception as e:
+                logger.warning(f"Failed to update donor profile: {str(e)}")
+
+        except Exception as e:
+            logger.error(f"Failed to create donation record: {str(e)}", exc_info=True)
+            # Continue with confirmation even if donation record creation fails
+
+        # Automatically resolve SOS when donation is confirmed
+        sos_request.status = 'resolved'
+        sos_request.resolved_at = timezone.now()
+        sos_request.resolution_notes = f'Donation confirmed from donor {response.responder.full_name or response.responder.email}'
+        sos_request.save()
+
+        logger.info(f"SOS {sos_id} automatically resolved after donation confirmation")
+
+        # Notify the donor about confirmed donation
+        try:
+            from notifications.models import Notification as NotificationModel
+            NotificationModel.objects.create(
+                user=response.responder,
+                title='Donation Confirmed! 🎉',
+                message=f'Your blood donation for {sos_request.requester.full_name or "a patient"} has been confirmed. Thank you for saving a life!',
+                type='donation_confirmed',
+                related_request_id=str(sos_request.id)
+            )
+            logger.info(f"Created notification for donor {response.responder.email}")
+        except Exception as e:
+            logger.warning(f"Failed to create notification: {str(e)}")
+
+        # Try to send push notification
         try:
             from notifications.services.fcm_service import notify_donor_donation_confirmed
             notify_donor_donation_confirmed(response)
         except Exception as e:
-            logger.warning(f"Failed to send notification to donor: {str(e)}")
+            logger.warning(f"Failed to send push notification to donor: {str(e)}")
 
         return success_response(
-            message='Donation confirmed. Thank you for updating!',
+            message='Donation confirmed and recorded in donor history. Thank you!',
             data={
                 'response': {
                     'id': str(response.id),
@@ -1715,6 +1804,19 @@ def reject_sos_response(request, sos_id, response_id):
 
         logger.info(f"{request.user.email} rejected response from {response.responder.email} for SOS {sos_id}")
 
+        # Update the existing notification type to hide accept/decline buttons
+        try:
+            from notifications.models import Notification
+            # Find the sos_response notification for this response and update its type
+            Notification.objects.filter(
+                user=sos_request.requester,
+                type='sos_response',
+                related_request_id=str(sos_request.id)
+            ).update(type='sos_response_rejected')
+            logger.info(f"Updated notification type to 'sos_response_rejected' for SOS {sos_id}")
+        except Exception as e:
+            logger.warning(f"Failed to update notification type: {str(e)}")
+
         # Notify the donor
         try:
             from notifications.services.fcm_service import notify_donor_response_rejected
@@ -1746,5 +1848,285 @@ def reject_sos_response(request, sos_id, response_id):
         logger.error(f"Error rejecting response: {str(e)}", exc_info=True)
         return error_response(
             message='An error occurred while rejecting the response.',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def debug_sos_notifications(request):
+    """
+    Debug endpoint to check SOS notification configuration.
+
+    GET /api/sos/debug-notifications/
+
+    Response (200 OK):
+    {
+        "success": true,
+        "firebase_configured": true,
+        "donors_checked": 5,
+        "eligible_donors": [
+            {
+                "email": "donor@example.com",
+                "blood_group": "A+",
+                "has_fcm_token": true,
+                "has_location": true,
+                "distance_km": 5.2,
+                "is_eligible": true
+            }
+        ],
+        "issues": ["List of any issues found"]
+    }
+    """
+    try:
+        from account.models import UserProfile
+        from account.fcm_service import get_compatible_blood_types, calculate_distance
+        import firebase_admin
+
+        # Check if Firebase is configured
+        firebase_configured = len(firebase_admin._apps) > 0
+
+        # Get all donor profiles
+        donor_profiles = UserProfile.objects.filter(
+            user__role='donor',
+            user__is_active=True
+        ).select_related('user').all()
+
+        # Use hospital location from a recent SOS or use a test location
+        test_lat = float(request.query_params.get('lat', 31.5204))  # Default: Lahore
+        test_lng = float(request.query_params.get('lng', 74.3587))
+        test_blood_type = request.query_params.get('blood_type', 'A+')
+
+        # Get compatible blood types
+        compatible_types = get_compatible_blood_types(test_blood_type)
+
+        eligible_donors = []
+        all_donors_info = []
+        issues = []
+
+        for donor in donor_profiles:
+            donor_info = {
+                'email': donor.user.email,
+                'blood_group': donor.blood_group,
+                'has_fcm_token': bool(donor.fcm_token),
+                'has_location': bool(donor.location_lat and donor.location_lng),
+                'fcm_token_preview': donor.fcm_token[:20] + '...' if donor.fcm_token else None,
+                'distance_km': None,
+                'is_eligible': False,
+                'issues': []
+            }
+
+            # Check blood type compatibility
+            if donor.blood_group not in compatible_types:
+                donor_info['issues'].append(f'Blood type {donor.blood_group} not compatible with {test_blood_type}')
+                issues.append(f"{donor.user.email}: Incompatible blood type")
+            elif donor.blood_group is None:
+                donor_info['issues'].append('No blood group set')
+                issues.append(f"{donor.user.email}: No blood group set")
+
+            # Check FCM token
+            if not donor.fcm_token:
+                donor_info['issues'].append('No FCM token registered')
+                issues.append(f"{donor.user.email}: No FCM token")
+
+            # Check location
+            if not donor.location_lat or not donor.location_lng:
+                donor_info['issues'].append('No location set')
+                issues.append(f"{donor.user.email}: No location set")
+            else:
+                # Calculate distance
+                distance = calculate_distance(
+                    float(donor.location_lat),
+                    float(donor.location_lng),
+                    test_lat, test_lng
+                )
+                donor_info['distance_km'] = round(distance, 2)
+
+                if distance > 50:
+                    donor_info['issues'].append(f'Outside 50km radius ({distance:.1f}km)')
+                    issues.append(f"{donor.user.email}: Outside radius")
+
+            # Determine eligibility
+            donor_info['is_eligible'] = len(donor_info['issues']) == 0
+            if donor_info['is_eligible']:
+                eligible_donors.append(donor_info)
+
+            all_donors_info.append(donor_info)
+
+        return success_response(
+            message='Debug information retrieved',
+            data={
+                'firebase_configured': firebase_configured,
+                'test_parameters': {
+                    'hospital_location': {'lat': test_lat, 'lng': test_lng},
+                    'blood_type': test_blood_type,
+                    'compatible_blood_types': compatible_types,
+                    'radius_km': 50
+                },
+                'donors_checked': len(donor_profiles),
+                'eligible_donors': eligible_donors,
+                'all_donors': all_donors_info,
+                'issues': issues
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error in debug endpoint: {str(e)}", exc_info=True)
+        return error_response(
+            message=f'Debug error: {str(e)}',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_donation_eligibility(request):
+    """
+    Check if user is eligible to donate based on last donation date.
+
+    GET /api/sos/check-donation-eligibility/
+
+    Standard donation cooldown: 56 days (8 weeks)
+
+    Response (200 OK):
+    {
+        "success": true,
+        "data": {
+            "is_eligible": true,
+            "last_donation_date": "2024-05-15",
+            "days_since_last_donation": 30,
+            "days_until_eligible": 26,
+            "cooldown_days": 56
+        }
+    }
+    """
+    try:
+        from account.models import UserProfile
+
+        # Standard donation cooldown period (56 days = 8 weeks)
+        COOLDOWN_DAYS = 56
+
+        profile = UserProfile.objects.filter(user=request.user).first()
+
+        if not profile or not profile.last_donation_date:
+            # No previous donation, user is eligible
+            return success_response(
+                message='No previous donation found. You are eligible to donate.',
+                data={
+                    'is_eligible': True,
+                    'last_donation_date': None,
+                    'days_since_last_donation': 0,
+                    'days_until_eligible': 0,
+                    'cooldown_days': COOLDOWN_DAYS,
+                    'message': 'You can donate blood!'
+                }
+            )
+
+        # Calculate days since last donation
+        last_donation = profile.last_donation_date
+        days_since = (timezone.now().date() - last_donation).days
+
+        if days_since >= COOLDOWN_DAYS:
+            return success_response(
+                message='You are eligible to donate!',
+                data={
+                    'is_eligible': True,
+                    'last_donation_date': last_donation.isoformat(),
+                    'days_since_last_donation': days_since,
+                    'days_until_eligible': 0,
+                    'cooldown_days': COOLDOWN_DAYS,
+                    'message': f'It has been {days_since} days since your last donation. You can donate again!'
+                }
+            )
+        else:
+            days_until = COOLDOWN_DAYS - days_since
+            return success_response(
+                message='You need to wait before donating again.',
+                data={
+                    'is_eligible': False,
+                    'last_donation_date': last_donation.isoformat(),
+                    'days_since_last_donation': days_since,
+                    'days_until_eligible': days_until,
+                    'cooldown_days': COOLDOWN_DAYS,
+                    'message': f'Please wait {days_until} more days before donating again.'
+                }
+            )
+
+    except Exception as e:
+        logger.error(f"Error checking donation eligibility: {str(e)}", exc_info=True)
+        return error_response(
+            message='Error checking eligibility.',
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def share_sos_request(request, sos_id):
+    """
+    Share an SOS request link (generates shareable link/info).
+
+    POST /api/sos/{sos_id}/share/
+
+    Response (200 OK):
+    {
+        "success": true,
+        "data": {
+            "share_link": "https://yourapp.com/sos/{uuid}",
+            "share_text": "Urgent blood needed...",
+            "sos_details": {...}
+        }
+    }
+    """
+    try:
+        sos_request = SOSRequest.objects.get(id=sos_id)
+
+        # Check if user is the requester (only requester can share their own SOS)
+        if sos_request.requester != request.user:
+            return error_response(
+                message='You can only share your own SOS requests.',
+                status_code=status.HTTP_403_FORBIDDEN
+            )
+
+        # Generate share information
+        base_url = getattr(settings, 'PUBLIC_BASE_URL', 'http://localhost:8000')
+        share_link = f"{base_url}/sos/{str(sos_request.id)}"
+
+        # Create shareable text
+        share_text = (
+            f"🆘 URGENT BLOOD NEEDED!\n\n"
+            f"Blood Type: {sos_request.blood_type}\n"
+            f"Hospital: {sos_request.hospital_name}\n"
+            f"Location: {sos_request.hospital_address}\n"
+            f"Contact: {sos_request.contact_number}\n\n"
+            f"Please share this with potential donors!\n"
+            f"View details: {share_link}"
+        )
+
+        logger.info(f"SOS {sos_id} shared by {request.user.email}")
+
+        return success_response(
+            message='SOS request share information generated.',
+            data={
+                'share_link': share_link,
+                'share_text': share_text,
+                'sos_details': {
+                    'id': str(sos_request.id),
+                    'blood_type': sos_request.blood_type,
+                    'hospital_name': sos_request.hospital_name,
+                    'status': sos_request.status
+                }
+            }
+        )
+
+    except SOSRequest.DoesNotExist:
+        return error_response(
+            message='SOS request not found.',
+            status_code=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error sharing SOS request: {str(e)}", exc_info=True)
+        return error_response(
+            message='Error generating share information.',
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

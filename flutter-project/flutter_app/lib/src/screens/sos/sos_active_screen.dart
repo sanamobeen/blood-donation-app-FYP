@@ -26,6 +26,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
   // Timer for elapsed time
   Timer? _timer;
   int _elapsedSeconds = 0;
+  bool _isTimerStopped = false; // Flag to track if timer is stopped
 
   // Map controller and markers
   late MapController _mapController;
@@ -37,6 +38,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
   // SOS data
   String? _sosId; // Store SOS ID for actions
   List<Map<String, dynamic>> _responders = [];
+  bool _isSOSResolved = false; // Track if SOS is resolved
 
   // Location
   Position? _currentPosition;
@@ -79,11 +81,17 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
+      if (mounted && !_isTimerStopped) {
         setState(() {
           _elapsedSeconds++;
         });
       }
+    });
+  }
+
+  void _stopTimer() {
+    setState(() {
+      _isTimerStopped = true;
     });
   }
 
@@ -373,8 +381,8 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
 
   Widget _buildHeader() {
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFFB71C1C),
+      decoration: BoxDecoration(
+        color: _isSOSResolved ? Colors.green : const Color(0xFFB71C1C),
       ),
       child: SafeArea(
         child: Padding(
@@ -406,7 +414,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
               // Title
               Expanded(
                 child: Text(
-                  'SOS Active — $_elapsedTime',
+                  _isSOSResolved ? 'SOS Completed ✓' : 'SOS Active — $_elapsedTime',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -416,22 +424,23 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
               ),
 
               // Refresh Button
-              GestureDetector(
-                onTap: _loadSOSData,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.refresh,
-                    color: Colors.white,
-                    size: 18,
+              if (!_isSOSResolved)
+                GestureDetector(
+                  onTap: _loadSOSData,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.refresh,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -763,12 +772,19 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
     final result = await ApiService.confirmDonation(sosId: _sosId!, responseId: responseId);
 
     if (result['success'] == true) {
+      // Stop the timer and mark SOS as resolved
+      _stopTimer();
+      setState(() {
+        _isSOSResolved = true;
+      });
+
       // Reload data to show updated status
       _loadSOSData();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Donation confirmed! Thank you for updating.'),
+            content: Text('Donation confirmed! SOS completed successfully.'),
             backgroundColor: Colors.green,
           ),
         );
@@ -902,19 +918,27 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
         width: double.infinity,
         child: ElevatedButton(
           onPressed: () {
-            _showCancelSOSDialog();
+            if (_isSOSResolved) {
+              // Just close the screen if SOS is resolved
+              Navigator.pop(context);
+            } else {
+              _showCancelSOSDialog();
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFFB71C1C),
+            foregroundColor: _isSOSResolved ? Colors.green : const Color(0xFFB71C1C),
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
-              side: const BorderSide(color: Color(0xFFB71C1C), width: 2),
+              side: BorderSide(
+                color: _isSOSResolved ? Colors.green : const Color(0xFFB71C1C),
+                width: 2,
+              ),
             ),
           ),
-          child: const Text(
-            'Cancel SOS',
+          child: Text(
+            _isSOSResolved ? 'Close' : 'Cancel SOS',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -975,10 +999,62 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
 
   void _showResponderDialog(Map<String, dynamic> responder) {
     // Handle different field names from backend
-    final name = responder['donor_name'] as String? ?? responder['full_name'] as String? ?? 'Unknown';
+    final name = responder['donor_name'] as String? ?? responder['full_name'] as String? ?? responder['responder_name'] as String? ?? 'Unknown';
     final bloodGroup = responder['blood_group'] as String? ?? 'Unknown';
     final eta = _parseInt(responder['estimated_arrival_minutes']);
     final distance = _calculateDistance(responder);
+    final phone = responder['contact_phone'] as String? ?? responder['phone'] as String?;
+    final note = responder['note'] as String?;
+    final status = responder['status'] as String? ?? 'pending';
+    final respondedAt = responder['responded_at'] as String? ?? responder['created_at'] as String?;
+
+    // Format response time
+    String responseTimeStr = '';
+    if (respondedAt != null) {
+      try {
+        final respondedTime = DateTime.parse(respondedAt).toLocal();
+        final now = DateTime.now();
+        final difference = now.difference(respondedTime);
+        if (difference.inMinutes < 60) {
+          responseTimeStr = '${difference.inMinutes}m ago';
+        } else if (difference.inHours < 24) {
+          responseTimeStr = '${difference.inHours}h ago';
+        } else {
+          responseTimeStr = '${respondedTime.day}/${respondedTime.month}';
+        }
+      } catch (e) {
+        responseTimeStr = 'Unknown';
+      }
+    }
+
+    // Status display
+    String statusDisplay = '';
+    Color statusColor = Colors.grey;
+    switch (status) {
+      case 'pending':
+        statusDisplay = 'Waiting';
+        statusColor = Colors.orange;
+        break;
+      case 'accepted':
+        statusDisplay = 'Accepted';
+        statusColor = Colors.green;
+        break;
+      case 'rejected':
+        statusDisplay = 'Passed';
+        statusColor = Colors.grey;
+        break;
+      case 'donated':
+        statusDisplay = 'Donated ✓';
+        statusColor = Colors.red;
+        break;
+      case 'no_show':
+        statusDisplay = 'No-Show';
+        statusColor = Colors.red.shade300;
+        break;
+      default:
+        statusDisplay = status;
+        statusColor = Colors.grey;
+    }
 
     showDialog(
       context: context,
@@ -986,105 +1062,245 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundColor: AppColors.softPink,
-              child: Text(
-                name[0].toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              name,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                bloodGroup,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildDialogStat(
-                  '${distance.toStringAsFixed(1)} km',
-                  'Distance',
-                ),
-                if (eta != null)
-                  _buildDialogStat(
-                    '$eta min',
-                    'ETA',
-                  )
-                else
-                  _buildDialogStat(
-                    (responder['is_available_for_donation'] as bool? ?? true)
-                        ? 'Available'
-                        : 'Busy',
-                    'Status',
-                  ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Close'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      // Navigate to call or chat
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Avatar and Status
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 45,
+                    backgroundColor: AppColors.softPink,
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : 'D',
+                      style: const TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
                     ),
-                    child: const Text('Contact'),
+                  ),
+                  // Status badge
+                  Positioned(
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        statusDisplay,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Name
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Blood Group
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.bloodtype,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      bloodGroup,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Stats Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildDialogStat(
+                    '${distance.toStringAsFixed(1)} km',
+                    'Distance',
+                    Icons.location_on_rounded,
+                  ),
+                  if (eta != null)
+                    _buildDialogStat(
+                      '$eta min',
+                      'ETA',
+                      Icons.access_time,
+                    )
+                  else
+                    _buildDialogStat(
+                      'Available',
+                      'Status',
+                      Icons.check_circle,
+                    ),
+                  _buildDialogStat(
+                    responseTimeStr.isNotEmpty ? responseTimeStr : 'Now',
+                    'Responded',
+                    Icons.schedule,
+                  ),
+                ],
+              ),
+
+              // Note from donor (if available)
+              if (note != null && note.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.note, size: 16, color: Colors.blue.shade700),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Message from donor:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        note,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ),
-          ],
+
+              // Phone number (if available)
+              if (phone != null && phone.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.phone, size: 18, color: Colors.green.shade700),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          phone,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade900,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          // Could add phone call functionality here
+                        },
+                        icon: Icon(Icons.call, color: Colors.green.shade700),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 24),
+
+              // Close button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDialogStat(String value, String label) {
+  Widget _buildDialogStat(String value, String label, IconData icon) {
     return Column(
       children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(height: 6),
         Text(
           value,
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
           ),
@@ -1092,7 +1308,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             color: AppColors.textSecondary,
           ),
         ),

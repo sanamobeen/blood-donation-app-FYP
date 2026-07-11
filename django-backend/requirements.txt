@@ -36,14 +36,9 @@ python-dotenv==1.0.1
 
 # Django Channels for WebSocket support (CRITICAL)
 channels==4.0.0
-channels-redis==4.1.0
 daphne==4.0.0
-redis==5.0.0
 
-# Celery for background tasks and scheduled jobs (CRITICAL)
-celery==5.3.0
-django-celery-beat>=2.7.0
-flower==2.0.0
+# NOTE: Background tasks removed - no longer using Celery
 
 # Geospatial libraries for GPS distance calculation
 geopy==2.4.0

@@ -640,6 +640,19 @@ class ApiService {
     }
   }
 
+  /// Format DateTime to ISO8601 string with timezone offset
+  /// This ensures the backend receives timezone-aware datetime
+  static String _formatDateTimeWithTimezone(DateTime dateTime) {
+    final duration = dateTime.timeZoneOffset;
+    final hours = duration.inHours.abs();
+    final minutes = duration.inMinutes.abs() - (hours * 60);
+    final sign = duration.isNegative ? '-' : '+';
+
+    // Format: 2024-07-11T21:41:00+05:00
+    final offset = '${sign}${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}';
+    return '${dateTime.toIso8601String()}$offset';
+  }
+
   /// Create a new blood request (public endpoint)
   static Future<Map<String, dynamic>> createBloodRequest({
     required String patientName,
@@ -660,7 +673,7 @@ class ApiService {
       final headers = await getAuthHeaders();
 
       // Debug: Log the needed_by value being sent
-      print('🐛 [createBloodRequest] Sending needed_by: ${neededBy.toIso8601String()}');
+      print('🐛 [createBloodRequest] Sending needed_by: ${_formatDateTimeWithTimezone(neededBy)}');
       print('🐛 [createBloodRequest] Original DateTime: $neededBy');
 
       final response = await http.post(
@@ -677,7 +690,8 @@ class ApiService {
           if (additionalNotes != null && additionalNotes.isNotEmpty) 'additional_notes': additionalNotes,
           if (locationLat != null && locationLng != null) 'location_lat': locationLat,
           if (locationLat != null && locationLng != null) 'location_lng': locationLng,
-          if (neededBy != null) 'needed_by': neededBy.toIso8601String(),
+          // Send datetime with timezone info to avoid timezone issues
+          if (neededBy != null) 'needed_by': _formatDateTimeWithTimezone(neededBy),
           if (quizResponses != null) 'quiz_responses': quizResponses,
         }),
       );
@@ -1395,8 +1409,8 @@ class ApiService {
     required String hospitalAddress,
     required String contactPhone,
     required String patientName,
-    required int age,
-    required String gender,
+    int? age,
+    String? gender,
     int unitsNeeded = 1,
     double? hospitalLat,
     double? hospitalLng,
@@ -1405,21 +1419,25 @@ class ApiService {
 
       final headers = await getAuthHeaders();
 
+      final body = {
+        'blood_type': bloodType,
+        'hospital_name': hospitalName,
+        'hospital_address': hospitalAddress,
+        'contact_phone': contactPhone,
+        'patient_name': patientName,
+        'units_needed': unitsNeeded,
+        if (hospitalLat != null) 'hospital_lat': hospitalLat,
+        if (hospitalLng != null) 'hospital_lng': hospitalLng,
+      };
+
+      // Only include age and gender if provided
+      if (age != null) body['age'] = age;
+      if (gender != null) body['gender'] = gender;
+
       final response = await http.post(
         Uri.parse('${ApiConfig.sosEndpoint}/'),
         headers: headers,
-        body: jsonEncode({
-          'blood_type': bloodType,
-          'hospital_name': hospitalName,
-          'hospital_address': hospitalAddress,
-          'contact_phone': contactPhone,
-          'patient_name': patientName,
-          'age': age,
-          'gender': gender,
-          'units_needed': unitsNeeded,
-          if (hospitalLat != null) 'hospital_lat': hospitalLat,
-          if (hospitalLng != null) 'hospital_lng': hospitalLng,
-        }),
+        body: jsonEncode(body),
       );
 
       final data = jsonDecode(response.body);
@@ -1955,29 +1973,6 @@ class ApiService {
         return {'success': true, 'data': data};
       } else {
         return {'success': false, 'message': data['message'] ?? 'Failed to acknowledge donation'};
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Network error: $e'};
-    }
-  }
-
-  /// Get donation certificate
-  static Future<Map<String, dynamic>> getDonationCertificate(String donationId) async {
-    try {
-
-      final headers = await getAuthHeaders();
-
-      final response = await http.get(
-        Uri.parse('${ApiConfig.donationsEndpoint}/$donationId/certificate/'),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        // Return the response as is - certificate fields are at root level
-        return data;
-      } else {
-        return {'success': false, 'message': 'Failed to get certificate'};
       }
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};

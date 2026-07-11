@@ -959,13 +959,18 @@ class _SOSDetailScreenState extends State<SOSDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildInfoChip('Age: $age', Icons.cake),
-              const SizedBox(width: 8),
-              _buildInfoChip(gender[0].toUpperCase() + gender.substring(1), Icons.wc),
-            ],
-          ),
+          // Show age and gender chips only if available
+          if (age > 0 || gender.isNotEmpty)
+            Row(
+              children: [
+                if (age > 0) ...[
+                  _buildInfoChip('Age: $age', Icons.cake),
+                  if (gender.isNotEmpty) const SizedBox(width: 8),
+                ],
+                if (gender.isNotEmpty)
+                  _buildInfoChip(gender[0].toUpperCase() + gender.substring(1), Icons.wc),
+              ],
+            ),
         ],
       ),
     );

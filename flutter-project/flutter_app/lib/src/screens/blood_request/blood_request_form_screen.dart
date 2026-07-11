@@ -466,15 +466,15 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
     final firstDate = today; // Start from today (no past dates)
     final lastDate = today.add(const Duration(days: 30)); // Max 30 days from today
 
-    // Calculate initial date - if already selected, use that, otherwise 6 hours from now
-    DateTime initialDate = _selectedNeededByDate ?? now.add(const Duration(hours: 6));
+    // Calculate initial date - if already selected, use that, otherwise use today's date
+    DateTime initialDate = _selectedNeededByDate ?? today;
 
     // Ensure initial date is within valid range
-    if (initialDate.isBefore(firstDate.add(const Duration(hours: 1)))) {
-      initialDate = now.add(const Duration(hours: 6));
+    if (initialDate.isBefore(firstDate)) {
+      initialDate = today;
     }
     if (initialDate.isAfter(lastDate)) {
-      initialDate = firstDate.add(const Duration(days: 1));
+      initialDate = lastDate;
     }
 
     final pickedDate = await showDatePicker(
@@ -516,13 +516,10 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
           _selectedNeededByDate!.day == pickedDate.day) {
         // Use existing time if editing the same date
         initialTime = TimeOfDay.fromDateTime(_selectedNeededByDate!);
-      } else if (isToday) {
-        // If picking today, start from 1 hour from now to prevent past times
-        final oneHourFromNow = freshNow.add(const Duration(hours: 1));
-        initialTime = TimeOfDay(hour: oneHourFromNow.hour, minute: oneHourFromNow.minute);
       } else {
-        // For future dates, default to a reasonable time (e.g., 10:00 AM)
-        initialTime = const TimeOfDay(hour: 10, minute: 0);
+        // Show current time by default for both today and future dates
+        // Patient can then adjust according to their requirement
+        initialTime = TimeOfDay.fromDateTime(freshNow);
       }
 
       // Now pick time
@@ -558,8 +555,18 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
         );
 
         // Validate: ensure date/time is at least 1 hour from now
-        final oneHourFromNow = validationNow.add(const Duration(hours: 1));
-        if (selectedDateTime.isBefore(oneHourFromNow)) {
+        // Compare at minute level by creating a threshold DateTime
+        final nowAtMinutePrecision = DateTime(
+          validationNow.year,
+          validationNow.month,
+          validationNow.day,
+          validationNow.hour,
+          validationNow.minute,
+        );
+        final oneHourFromNow = nowAtMinutePrecision.add(const Duration(hours: 1));
+
+        // Show SOS if selected time is not after 1 hour from now
+        if (!selectedDateTime.isAfter(oneHourFromNow)) {
           // For urgent needs (within 1 hour), show SOS dialog
           _showSosDialog();
           return;
@@ -765,11 +772,19 @@ class _BloodRequestFormScreenState extends State<BloodRequestFormScreen> {
       return;
     }
 
-    // Validate that the selected date/time is not in the past
+    // Validate that the selected date/time is at least 1 hour from now
     final now = DateTime.now();
-    final oneHourFromNow = now.add(const Duration(hours: 1));
+    // Compare at minute level for accuracy
+    final nowAtMinutePrecision = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+    );
+    final oneHourFromNow = nowAtMinutePrecision.add(const Duration(hours: 1));
 
-    if (_selectedNeededByDate!.isBefore(oneHourFromNow)) {
+    if (!_selectedNeededByDate!.isAfter(oneHourFromNow)) {
       _showSosDialog();
       return;
     }

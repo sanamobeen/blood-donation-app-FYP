@@ -238,12 +238,33 @@ class NotificationService {
     final urgency = message.data['urgency'] ?? 'normal';
     final bloodType = message.data['blood_type'] ?? 'Unknown';
     final hospitalName = message.data['hospital_name'] ?? 'Unknown Hospital';
+    final patientName = message.data['patient_name'] ?? 'Patient';
+    final distanceKm = message.data['distance_km'] ?? '0';
+    final createdAt = message.data['created_at'] ?? '';
 
-    // Show high-priority notification
+    // Format the body with all information
+    final bodyParts = [
+      '🩸 $bloodType blood needed',
+      '📍 ${distanceKm}km away',
+      '🏥 $hospitalName',
+    ];
+
+    // Add time if available
+    if (createdAt.isNotEmpty) {
+      try {
+        final dateTime = DateTime.parse(createdAt).toLocal();
+        final timeStr = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+        bodyParts.add('⏰ Requested at $timeStr');
+      } catch (e) {
+        // If parsing fails, skip the time
+      }
+    }
+
+    // Show high-priority notification with patient name in title
     LocalNotificationService().showNotification(
       id: message.hashCode,
-      title: '🚨 URGENT: Blood Needed!',
-      body: '$bloodType blood needed at $hospitalName\nTap to help now!',
+      title: '🚨 Urgent Blood Request: $patientName',
+      body: bodyParts.join('\n'),
       payload: jsonEncode(message.data),
       channelId: 'sos_critical',
       importance: Importance.max,

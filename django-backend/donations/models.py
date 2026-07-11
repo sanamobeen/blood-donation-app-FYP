@@ -81,18 +81,6 @@ class Donation(models.Model):
         help_text="Additional notes about the donation"
     )
 
-    # Certificate
-    certificate_number = models.CharField(
-        max_length=50,
-        unique=True,
-        null=True,
-        blank=True,
-        help_text="Unique certificate number"
-    )
-    certificate_issued = models.BooleanField(
-        default=False,
-        help_text="Whether donation certificate has been issued"
-    )
 
     # Patient Acknowledgment
     acknowledged_by_patient = models.BooleanField(
@@ -103,6 +91,19 @@ class Donation(models.Model):
         null=True,
         blank=True,
         help_text="When patient acknowledged the donation"
+    )
+
+    # Certificate
+    certificate_issued = models.BooleanField(
+        default=False,
+        help_text="Whether donation certificate has been issued"
+    )
+    certificate_number = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        unique=True,
+        help_text="Unique certificate number"
     )
 
     # Timestamps
@@ -123,22 +124,6 @@ class Donation(models.Model):
         donor_email = self.donor.email if self.donor else 'Unknown'
         return f"{donor_email} - {self.blood_type} ({self.donation_date})"
 
-    def generate_certificate_number(self):
-        """Generate a unique certificate number."""
-        import random
-        import string
-        from datetime import datetime
-
-        if self.certificate_number:
-            return self.certificate_number
-
-        # Generate format: DN-2024-XXXX (Year + random)
-        year = datetime.now().year
-        random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-        self.certificate_number = f"DN-{year}-{random_str}"
-        self.save(update_fields=['certificate_number'])
-        return self.certificate_number
-
     @property
     def can_be_acknowledged_by(self, user):
         """Check if user can acknowledge this donation (must be the requester of the blood request)"""
@@ -148,5 +133,5 @@ class Donation(models.Model):
 
     @property
     def is_fulfilled(self):
-        """Check if donation is fulfilled (acknowledged and certificate issued)"""
-        return self.acknowledged_by_patient and self.certificate_issued
+        """Check if donation is fulfilled (acknowledged by patient)"""
+        return self.acknowledged_by_patient
