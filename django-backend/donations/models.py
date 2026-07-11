@@ -93,6 +93,19 @@ class Donation(models.Model):
         help_text="When patient acknowledged the donation"
     )
 
+    # Certificate
+    certificate_issued = models.BooleanField(
+        default=False,
+        help_text="Whether donation certificate has been issued"
+    )
+    certificate_number = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        unique=True,
+        help_text="Unique certificate number"
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

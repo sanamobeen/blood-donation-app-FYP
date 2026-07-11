@@ -11,17 +11,33 @@ class MyDonationsScreen extends StatefulWidget {
   State<MyDonationsScreen> createState() => _MyDonationsScreenState();
 }
 
-class _MyDonationsScreenState extends State<MyDonationsScreen> {
+class _MyDonationsScreenState extends State<MyDonationsScreen>
+    with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   String? _errorMessage;
   List<DonationResponse> _donations = [];
   int _totalDonations = 0;
   int _totalUnits = 0;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
     _loadDonations();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDonations() async {
@@ -47,6 +63,7 @@ class _MyDonationsScreenState extends State<MyDonationsScreen> {
             _totalUnits = donationsList.fold(0, (sum, d) => sum + d.units);
             _isLoading = false;
           });
+          _animationController.forward();
         } else {
           setState(() {
             _errorMessage = response['message'] as String? ?? 'Failed to load donations';
@@ -77,8 +94,12 @@ class _MyDonationsScreenState extends State<MyDonationsScreen> {
     }
   }
 
+  int _getLivesSaved() {
+    // Each donation can save up to 3 lives
+    return _totalDonations * 3;
+  }
+
   String _getVolumeDonated() {
-    // Average adult has ~5 liters of blood, 1 unit ≈ 450ml
     final totalMl = _totalUnits * 450;
     if (totalMl >= 1000) {
       return '${(totalMl / 1000).toStringAsFixed(1)}L';
@@ -93,8 +114,8 @@ class _MyDonationsScreenState extends State<MyDonationsScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Navigation Bar
-            _buildNavigationBar(),
+            // Professional Header
+            _buildAppBar(),
 
             // Main Content
             Expanded(
@@ -110,27 +131,35 @@ class _MyDonationsScreenState extends State<MyDonationsScreen> {
     );
   }
 
-  Widget _buildNavigationBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  Widget _buildAppBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Row(
         children: [
           // Back Button
           GestureDetector(
-            onTap: () {
-              Navigator.pop(context);
-            },
+            onTap: () => Navigator.pop(context),
             child: Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300, width: 1),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
                 size: 20,
-                color: Colors.black,
+                color: AppColors.primary,
               ),
             ),
           ),
@@ -139,28 +168,28 @@ class _MyDonationsScreenState extends State<MyDonationsScreen> {
             child: Text(
               'My Donations',
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
           ),
 
-          // Refresh Icon
+          // Refresh Button
           GestureDetector(
             onTap: _loadDonations,
             child: Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300, width: 1),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
-                Icons.refresh,
-                size: 20,
-                color: Colors.black,
+                Icons.refresh_rounded,
+                size: 22,
+                color: AppColors.primary,
               ),
             ),
           ),
@@ -176,13 +205,15 @@ class _MyDonationsScreenState extends State<MyDonationsScreen> {
         children: [
           CircularProgressIndicator(
             color: AppColors.primary,
+            strokeWidth: 3,
           ),
-          SizedBox(height: 16),
+          SizedBox(height: 20),
           Text(
-            'Loading donations...',
+            'Loading your donation history...',
             style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
+              fontSize: 15,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -192,303 +223,633 @@ class _MyDonationsScreenState extends State<MyDonationsScreen> {
 
   Widget _buildErrorState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.red.shade100,
-              shape: BoxShape.circle,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.red.shade200, width: 2),
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                color: Colors.red.shade400,
+                size: 48,
+              ),
             ),
-            child: Icon(
-              Icons.error_outline,
-              color: Colors.red.shade700,
-              size: 40,
+            const SizedBox(height: 24),
+            Text(
+              _errorMessage ?? 'Failed to load donations',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _errorMessage ?? 'Failed to load donations',
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.black87,
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: _loadDonations,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _loadDonations,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Retry'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildContent() {
     if (_donations.isEmpty) {
-      return Center(
+      return _buildEmptyState();
+    }
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+        child: Column(
+          children: [
+            // Hero Stats Section
+            _buildHeroStats(),
+
+            const SizedBox(height: 24),
+
+            // Impact Section
+            _buildImpactSection(),
+
+            const SizedBox(height: 24),
+
+            // Donation History Section
+            _buildDonationHistorySection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.volunteer_activism_outlined,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No donations yet',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.volunteer_activism_rounded,
+                size: 56,
+                color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Your donation history will appear here',
+            const SizedBox(height: 24),
+            const Text(
+              'Start Your Journey',
               style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You haven\'t made any donations yet.\nEvery donation saves up to 3 lives!',
+              style: TextStyle(
+                fontSize: 15,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.bloodtype_rounded),
+              label: const Text('Find Requests'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
               ),
             ),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    return SingleChildScrollView(
+  Widget _buildHeroStats() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, Color(0xFFD32F2F)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
         children: [
-          const SizedBox(height: 16),
-
-          // Summary Statistics Card
-          _buildSummaryCard(),
-
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.favorite_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Your Impact',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$_totalDonations Donation${_totalDonations == 1 ? '' : 's'}',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
-
-          // Donation History Timeline
-          _buildDonationTimeline(),
-
-          const SizedBox(height: 32),
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  value: '$_totalUnits',
+                  label: 'Units',
+                  icon: Icons.water_drop_rounded,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _StatCard(
+                  value: _getVolumeDonated(),
+                  label: 'Volume',
+                  icon: Icons.science_rounded,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryCard() {
+  Widget _buildImpactSection() {
+    final livesSaved = _getLivesSaved();
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF0F0),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildSummaryItem(
-            icon: Icons.favorite,
-            value: '$_totalDonations',
-            label: 'Donations',
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.green.shade400,
+                  Colors.green.shade600,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.health_and_safety_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
           ),
-          _buildSummaryItem(
-            icon: Icons.water_drop,
-            value: '$_totalUnits',
-            label: 'Units Donated',
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Lives Impacted',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      '$livesSaved',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'lives',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryItem({
-    required IconData icon,
-    required String value,
-    required String label,
-  }) {
+  Widget _buildDonationHistorySection() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          color: AppColors.primary,
-          size: 24,
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 20,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Donation History',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-          ),
-        ),
+        const SizedBox(height: 16),
+        ..._donations.asMap().entries.map((entry) {
+          final index = entry.key;
+          final donation = entry.value;
+          return _DonationCard(
+            donation: donation,
+            formatDate: _formatDate,
+            isLast: index == _donations.length - 1,
+          );
+        }),
       ],
     );
   }
+}
 
-  Widget _buildDonationTimeline() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: _donations.map((donation) {
-          return _DonationTimelineItem(
-            donation: donation,
-            formatDate: _formatDate,
-            onTap: null,
-          );
-        }).toList(),
+class _StatCard extends StatelessWidget {
+  final String value;
+  final String label;
+  final IconData icon;
+
+  const _StatCard({
+    required this.value,
+    required this.label,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _DonationTimelineItem extends StatelessWidget {
+class _DonationCard extends StatelessWidget {
   final DonationResponse donation;
   final String Function(String) formatDate;
-  final VoidCallback? onTap;
+  final bool isLast;
 
-  const _DonationTimelineItem({
+  const _DonationCard({
     required this.donation,
     required this.formatDate,
-    this.onTap,
+    required this.isLast,
   });
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _getStatusColor(donation);
+    final statusConfig = _getStatusConfig(donation);
 
     return Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey.shade200,
-            width: 1,
-          ),
+      margin: EdgeInsets.only(bottom: isLast ? 0 : 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: statusConfig.borderColor.withOpacity(0.3),
+          width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            // Timeline Dot
-            Column(
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    shape: BoxShape.circle,
+            // Status Badge Container
+            Container(
+              width: 56,
+              decoration: BoxDecoration(
+                color: statusConfig.backgroundColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: statusConfig.backgroundColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      statusConfig.icon,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
-                ),
-                Container(
-                  width: 2,
-                  height: 60,
-                  color: Colors.grey.shade300,
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  if (!isLast)
+                    Container(
+                      width: 2,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: statusConfig.borderColor.withOpacity(0.3),
+                      ),
+                    ),
+                ],
+              ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
 
             // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    formatDate(donation.donationDate),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    donation.statusDisplay,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: statusColor,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (donation.patientName != null && donation.patientName!.isNotEmpty)
-                    Text(
-                      'Donated to: ${donation.patientName}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  const SizedBox(height: 6),
+                  // Date and Status Badge
                   Row(
                     children: [
-                      const Icon(
-                        Icons.water_drop,
-                        color: AppColors.primary,
-                        size: 14,
-                      ),
-                      const SizedBox(width: 4),
                       Text(
-                        '${donation.units} unit${donation.units > 1 ? 's' : ''}',
+                        formatDate(donation.donationDate),
                         style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      if (donation.bloodType != null || donation.bloodTypeCode != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusConfig.backgroundColor,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              statusConfig.icon,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              statusConfig.label,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Patient Info
+                  if (donation.patientName != null &&
+                      donation.patientName!.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person_outline_rounded,
+                          size: 14,
+                          color: AppColors.textSecondary.withOpacity(0.7),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Donated to: ${donation.patientName}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 8),
+
+                  // Details Row
+                  Row(
+                    children: [
+                      // Units Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.water_drop_rounded,
+                              color: AppColors.primary,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${donation.units} unit${donation.units > 1 ? 's' : ''}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Blood Type Badge
+                      if (donation.bloodType != null ||
+                          donation.bloodTypeCode != null) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
+                            horizontal: 10,
+                            vertical: 5,
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             donation.bloodType ?? donation.bloodTypeCode ?? 'N/A',
                             style: const TextStyle(
-                              fontSize: 10,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
                           ),
                         ),
                       ],
-                      if (donation.donorName.isNotEmpty) ...[
+
+                      // Location
+                      if (donation.donationCenter != null &&
+                          donation.donationCenter!.isNotEmpty) ...[
                         const SizedBox(width: 8),
-                        Icon(
-                          Icons.person,
-                          size: 14,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          donation.donorName,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade600,
+                        Expanded(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.location_on_outlined,
+                                size: 14,
+                                color: AppColors.textSecondary.withOpacity(0.6),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  donation.donationCenter!,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -499,12 +860,46 @@ class _DonationTimelineItem extends StatelessWidget {
             ),
           ],
         ),
+      ),
     );
   }
 
-  Color _getStatusColor(DonationResponse donation) {
-    if (donation.isFulfilled) return const Color(0xFF2A9D8F);
-    if (donation.acknowledgedByPatient) return const Color(0xFFE9C46A);
-    return const Color(0xFF6C757D);
+  _StatusConfig _getStatusConfig(DonationResponse donation) {
+    if (donation.isFulfilled) {
+      return _StatusConfig(
+        label: 'Completed',
+        icon: Icons.check_circle_rounded,
+        backgroundColor: const Color(0xFF2A9D8F),
+        borderColor: const Color(0xFF2A9D8F),
+      );
+    } else if (donation.acknowledgedByPatient) {
+      return _StatusConfig(
+        label: 'Acknowledged',
+        icon: Icons.verified_rounded,
+        backgroundColor: const Color(0xFFE9C46A),
+        borderColor: const Color(0xFFE9C46A),
+      );
+    } else {
+      return _StatusConfig(
+        label: 'Recorded',
+        icon: Icons.history_rounded,
+        backgroundColor: const Color(0xFF6C757D),
+        borderColor: const Color(0xFF6C757D),
+      );
+    }
   }
+}
+
+class _StatusConfig {
+  final String label;
+  final IconData icon;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  _StatusConfig({
+    required this.label,
+    required this.icon,
+    required this.backgroundColor,
+    required this.borderColor,
+  });
 }

@@ -22,7 +22,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  int _selectedTabIndex = 4; // Profile tab is index 4
+  int _selectedTabIndex = 3; // Profile tab is index 3 (0=Home, 1=Request, 2=Chat, 3=Profile)
 
   // Toggle states
   bool _donationRemindersEnabled = true;
@@ -474,6 +474,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return UnifiedBottomNavigationBar(
       selectedIndex: _selectedTabIndex,
       onItemTapped: (index) {
+        // Skip navigation if already on the same screen (index 3 = Settings/Profile)
+        if (index == 3) {
+          // Already on Settings screen, don't navigate
+          return;
+        }
+
         setState(() => _selectedTabIndex = index);
         // Routes: 0=Home, 1=Request, 2=Chat, 3=Profile
         switch (index) {
@@ -488,8 +494,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Navigator.pushReplacementNamed(context, AppRoutes.messages);
             break;
           case 3:
-            // Already on Settings (Profile) - refresh
-            Navigator.pushReplacementNamed(context, AppRoutes.settings);
+            // Already on Settings (Profile) - skip navigation
             break;
         }
       },

@@ -32,6 +32,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   String? _errorMessage;
   RoleProvider? _roleProvider;
   bool _isAcceptingPledge = false; // Add flag to prevent double clicks
+  bool _isCompletingDonation = false; // Flag for completing donation
 
   // Blood requests data
   BloodRequestListResponse? _requestsResponse;
@@ -486,6 +487,169 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       if (mounted) {
         setState(() {
           _isAcceptingPledge = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _completeDonation(Map<String, dynamic> donorData) async {
+    // Prevent double clicks
+    if (_isCompletingDonation) {
+      return;
+    }
+
+    try {
+      final donor = donorData['donor'] as Map<String, dynamic>;
+      final requestId = donorData['request_id'] as String;
+      final pledgeId = donorData['pledge_id'] as String;
+      final unitsPledged = donor['units_pledged'] as int? ?? 1;
+
+      if (requestId.isEmpty || pledgeId.isEmpty) {
+        throw Exception('Invalid request ID or pledge ID');
+      }
+
+      // Show confirmation dialog
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirm Donation Completion'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Please confirm that you have received blood from ${donor['name'] as String? ?? 'this donor'}.',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.softPink.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This will mark $unitsPledged ${unitsPledged == 1 ? "unit" : "units"} as received.',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Confirm Donation'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      setState(() {
+        _isCompletingDonation = true;
+      });
+
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('Completing donation...'),
+              ],
+            ),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+
+      // Call the complete pledge donation API
+      final response = await ApiService.completePledgeDonation(
+        requestId: requestId,
+        pledgeId: pledgeId,
+        unitsDonated: unitsPledged,
+      );
+
+      if (mounted) {
+        if (response['success'] == true) {
+          // Refresh the responding donors list and blood requests
+          await _loadRespondingDonors();
+          await _loadData();
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      response['message'] ?? 'Donation completed successfully!',
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        } else {
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response['message'] ?? 'Failed to complete donation'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error completing donation: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCompletingDonation = false;
         });
       }
     }
@@ -1544,64 +1708,65 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Secondary actions (Call and Chat)
-                  Row(
-                    children: [
-                      // Call button
-                      if (donor['phone'] != null)
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              // TODO: Implement call functionality
-                            },
-                            icon: const Icon(Icons.call, size: 16),
-                            label: const Text('Call'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              side: BorderSide(color: AppColors.primary),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                            ),
-                          ),
-                        ),
-                      if (donor['phone'] != null) const SizedBox(width: 8),
-                      // Chat button
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _openChatWithDonor(donorData),
-                          icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                          label: const Text('Chat'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                          ),
-                        ),
+                  // Secondary action (Chat only)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _openChatWithDonor(donorData),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                      label: const Text('Chat'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
-                    ],
+                    ),
                   ),
                 ],
               )
             else
-              // Show Call and Chat buttons in one row when accept is not available
+              // Show Complete and Chat buttons in one row when accept is not available (pledge already accepted)
               Row(
                 children: [
-                  // Call button
-                  if (donor['phone'] != null)
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement call functionality
-                        },
-                        icon: const Icon(Icons.call, size: 16),
-                        label: const Text('Call'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: BorderSide(color: AppColors.primary),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
+                  // Complete button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      // Disable button if already completed or currently completing
+                      onPressed: (pledge['status'] == 'completed' || _isCompletingDonation)
+                          ? null
+                          : () => _completeDonation(donorData),
+                      icon: _isCompletingDonation
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : (pledge['status'] == 'completed'
+                              ? const Icon(Icons.check_circle, size: 16)
+                              : const Icon(Icons.check_circle, size: 16)),
+                      label: Text(
+                        pledge['status'] == 'completed'
+                            ? 'Completed'
+                            : (_isCompletingDonation ? 'Completing...' : 'Complete'),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        // Show white/gray when completed, green when not completed
+                        backgroundColor: pledge['status'] == 'completed'
+                            ? Colors.grey.shade300
+                            : Colors.green,
+                        foregroundColor: pledge['status'] == 'completed'
+                            ? Colors.grey.shade600
+                            : Colors.white,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        disabledForegroundColor: Colors.grey.shade600,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
-                  if (donor['phone'] != null) const SizedBox(width: 8),
+                  ),
+                  const SizedBox(width: 8),
                   // Chat button
                   Expanded(
                     child: ElevatedButton.icon(
@@ -2275,6 +2440,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       selectedIndex: getCurrentIndex(),
       chatUnreadCount: _chatUnreadCount,
       onItemTapped: (index) {
+        // Get current index to avoid reloading if already on the same screen
+        final currentIndex = getCurrentIndex();
+
+        // Skip navigation if already on the same screen
+        if (index == currentIndex) {
+          return;
+        }
+
         // Handle navigation taps explicitly
         switch (index) {
           case 0: // Home

@@ -828,6 +828,19 @@ def create_pledge(request, request_id):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
 
+        # Check if user has any ACTIVE pledge to another request (one pledge at a time rule)
+        active_pledge = DonorResponse.objects.filter(
+            donor=request.user,
+            status__in=['pledged', 'accepted', 'confirmed', 'on_the_way', 'arrived', 'ready']
+        ).exclude(blood_request=blood_request).first()
+
+        if active_pledge:
+            logger.info(f"❌ User has active pledge to another request: {active_pledge.id}")
+            return error_response(
+                message='You can only pledge to one request at a time. Please complete your current pledge before pledging to another request.',
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
         # Check if donor is in cooldown period after completing a donation (56 days)
         from datetime import timedelta
         from django.utils import timezone
@@ -2370,20 +2383,36 @@ def complete_pledge_donation(request, request_id, pledge_id):
 
     # Send notification AFTER the atomic transaction completes
     # This ensures notification failures don't break the transaction
-    if pledge_donor and notification_data.isNotEmpty:
+    if pledge_donor and notification_data:
         try:
-            from notifications.models import Notification
-            Notification.objects.create(
+            from notifications.views import send_push_notification
+            # Get patient name for the notification
+            patient_name = blood_request.requested_by.full_name if blood_request.requested_by else 'Patient'
+
+            # Build notification data with all relevant information
+            notif_data = {
+                'request_id': str(notification_data['blood_request_id']),
+                'pledge_id': str(notification_data['pledge_id']),
+                'units_donated': notification_data['units_donated'],
+                'patient_name': patient_name,
+                'blood_group': blood_request.blood_group,
+            }
+
+            logger.info(f"Sending donation completion notification to donor {pledge_donor.email}")
+
+            # Use send_push_notification to send both in-app and push notification
+            notification = send_push_notification(
                 user=pledge_donor,
-                title='Thank You for Donating!',
-                message=f'Your donation of {notification_data["units_donated"]} unit(s) has been confirmed. You have helped save a life!',
-                type='donation_confirmed',
-                related_request_id=notification_data['blood_request_id'],
-                related_pledge_id=notification_data['pledge_id']
+                title='Request Completed by Patient ✅',
+                message=f'{patient_name} has confirmed/completed your blood donation request. Thank you for donating!',
+                notif_type='donation_confirmed',
+                data=notif_data,
+                send_push=True
             )
-            logger.info(f"Notification sent to donor {pledge_donor.email}")
+            logger.info(f"✅ Push notification sent to donor {pledge_donor.email}: 'Request Completed by Patient'")
+            logger.info(f"✅ Notification created: ID={notification.id if notification else 'N/A'}")
         except Exception as e:
-            logger.warning(f"Failed to create notification: {e}")
+            logger.error(f"❌ Failed to send push notification: {str(e)}", exc_info=True)
 
 
 @api_view(['GET'])
@@ -2414,22 +2443,30 @@ def get_my_pledges(request):
         # Get filter
         status_filter = request.query_params.get('status')
 
-        # Build queryset
+        # Build queryset - exclude completed pledges by default
+        # (completed donations appear in "My Donations" instead)
         queryset = DonorResponse.objects.filter(
             donor=request.user
-        ).select_related('blood_request').order_by('-created_at')
+        ).exclude(status='completed').select_related('blood_request').order_by('-created_at')
 
         if status_filter:
-            queryset = queryset.filter(status=status_filter)
+            # If specifically requesting completed status, include them
+            if status_filter == 'completed':
+                queryset = DonorResponse.objects.filter(
+                    donor=request.user,
+                    status=status_filter
+                ).select_related('blood_request').order_by('-created_at')
+            else:
+                queryset = queryset.filter(status=status_filter)
 
-        # Calculate summary
+        # Calculate summary - counts all pledges including completed
         all_pledges = DonorResponse.objects.filter(donor=request.user)
         summary = {
             'total': all_pledges.count(),
             'pending': all_pledges.filter(status='pending').count(),
             'accepted': all_pledges.filter(status='accepted').count(),
             'rejected': all_pledges.filter(status='rejected').count(),
-            'donated': all_pledges.filter(status='completed').count(),
+            'donated': all_pledges.filter(status='completed').count(),  # Shows in My Donations
             'cancelled': all_pledges.filter(status='cancelled').count(),
         }
 

@@ -78,10 +78,29 @@ class BloodRequestSerializer(serializers.ModelSerializer):
         return value
 
     def validate_needed_by(self, value):
-        """Validate needed_by date is in the future."""
+        """Validate needed_by date is in the future.
+
+        Handles both naive and timezone-aware datetimes from frontend.
+        - Naive datetime: Treated as UTC (backward compatibility)
+        - Timezone-aware datetime: Parsed with timezone info (preferred)
+        """
         from django.utils import timezone
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Log the received datetime
+        logger.info(f"Received needed_by datetime: {value}, aware: {timezone.is_aware(value) if value else 'N/A'}")
+
+        # If datetime is naive, make it timezone-aware (treat as UTC for backward compatibility)
+        if value and not timezone.is_aware(value):
+            logger.info(f"Converting naive needed_by datetime to UTC-aware: {value}")
+            value = timezone.make_aware(value, timezone.utc)
+            logger.info(f"Converted to UTC-aware: {value}")
+
+        # Validate that the date is in the future
         if value and value < timezone.now():
             raise serializers.ValidationError("Needed by date must be in the future.")
+
         return value
 
     def create(self, validated_data):
