@@ -384,9 +384,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         ),
                         const SizedBox(height: 4),
 
-                        // Blood Donation text
+                        // Blood Donor text
                         const Text(
-                          'Blood Donation',
+                          'Blood Donor',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,

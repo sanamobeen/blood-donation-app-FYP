@@ -148,46 +148,6 @@ class _MessagesScreenApiState extends State<MessagesScreenApi> {
                   ),
                 ),
               ),
-            const SizedBox(width: 12),
-            // Filter Icon
-            GestureDetector(
-              onTap: () {
-                _showFilterDialog();
-              },
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.filter_list_rounded,
-                  color: AppColors.textPrimary,
-                  size: 22,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // New Message Icon
-            GestureDetector(
-              onTap: () {
-                _showNewMessageDialog();
-              },
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.edit_rounded,
-                  color: AppColors.textPrimary,
-                  size: 22,
-                ),
-              ),
-            ),
           ],
         ),
       ),

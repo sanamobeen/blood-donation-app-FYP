@@ -240,9 +240,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // Blood Donation text
+                          // Blood Donor text
                           const Text(
-                            'Blood Donation',
+                            'Blood Donor',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,

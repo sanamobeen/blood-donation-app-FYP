@@ -205,7 +205,6 @@ class _NotificationsScreenApiState extends State<NotificationsScreenApi> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Back button
           GestureDetector(
@@ -225,33 +224,15 @@ class _NotificationsScreenApiState extends State<NotificationsScreenApi> {
             ),
           ),
 
-          // Title
+          const SizedBox(width: 16),
+
+          // Title on the left
           Text(
             'Notifications${_unreadCount > 0 ? ' ($_unreadCount)' : ''}',
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
-            ),
-          ),
-
-          // Settings icon
-          GestureDetector(
-            onTap: () {
-              _showNotificationSettings();
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.softPink.withOpacity(0.5),
-              ),
-              child: const Icon(
-                Icons.settings,
-                color: AppColors.primary,
-                size: 22,
-              ),
             ),
           ),
         ],
