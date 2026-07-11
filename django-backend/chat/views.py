@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import Q
+from django.db.models.functions import Coalesce
 import datetime
 import logging
 
@@ -125,13 +126,17 @@ def get_conversations(request):
     GET /api/chat/conversations/
 
     Returns conversations with participant details and message counts.
+    Sorted by most recent message first (like WhatsApp).
     """
     try:
+        # Sort by last_message_at (most recent first), fall back to created_at for new conversations
         conversations = Conversation.objects.filter(
             is_active=True
         ).filter(
             Q(patient=request.user) | Q(donor=request.user)
-        ).select_related('patient', 'donor', 'blood_request').order_by('-updated_at')
+        ).select_related('patient', 'donor', 'blood_request').order_by(
+            Coalesce('last_message_at', 'created_at').desc()
+        )
 
         serializer = ConversationSerializer(
             conversations,
@@ -160,7 +165,7 @@ def get_messages(request, conversation_id):
 
     GET /api/chat/conversations/{conversation_id}/messages/
 
-    Returns non-deleted messages and marks them as read.
+    Returns non-deleted messages, conversation details, and marks them as read.
     """
     try:
         conversation = Conversation.objects.get(
@@ -190,9 +195,18 @@ def get_messages(request, conversation_id):
             context={'request': request}
         )
 
+        # Serialize conversation details with participant info
+        conversation_serializer = ConversationSerializer(
+            conversation,
+            context={'request': request}
+        )
+
         return success_response(
             'Messages retrieved.',
-            {'messages': serializer.data}
+            {
+                'conversation': conversation_serializer.data,
+                'messages': serializer.data
+            }
         )
 
     except Conversation.DoesNotExist:

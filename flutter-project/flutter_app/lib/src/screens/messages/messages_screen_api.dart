@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../widgets/bottom_navigation_bar.dart';
-import '../chat/chat_conversation_screen.dart';
+import 'chat_conversation_screen_api.dart';
 
 /// Messages Screen with API integration
 class MessagesScreenApi extends StatefulWidget {
@@ -268,7 +268,7 @@ class _MessagesScreenApiState extends State<MessagesScreenApi> {
         ? _conversations
         : _conversations.where((c) {
             final name = (c['other_participant']?['full_name'] as String? ?? '').toLowerCase();
-            final message = (c['last_message'] as String? ?? '').toLowerCase();
+            final message = (c['last_message_content'] as String? ?? '').toLowerCase();
             final query = _searchController.text.toLowerCase();
             return name.contains(query) || message.contains(query);
           }).toList();
@@ -314,12 +314,12 @@ class _MessagesScreenApiState extends State<MessagesScreenApi> {
         return _ConversationTile(
           id: conversation['id'] as String,
           name: conversation['other_participant']?['full_name'] as String? ?? 'Unknown',
-          avatar: conversation['other_participant']?['avatar_url'] as String?,
-          message: conversation['last_message'] as String? ?? '',
+          avatar: conversation['other_participant_picture'] as String?,
+          message: conversation['last_message_content'] as String? ?? '',
           time: _formatTime(conversation['last_message_at'] as String?),
           unreadCount: conversation['unread_count'] as int? ?? 0,
           isOnline: false, // You can add this field to API response if needed
-          isHospital: conversation['related_request'] != null,
+          isHospital: conversation['blood_request'] != null,
           onTap: () {
             _openConversation(conversation);
           },
@@ -390,12 +390,12 @@ class _MessagesScreenApiState extends State<MessagesScreenApi> {
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => ChatConversationScreen(
+        builder: (context) => ChatConversationScreenApi(
           name: conversation['other_participant']?['full_name'] as String? ?? 'Unknown',
-          avatar: conversation['other_participant']?['avatar_url'] as String?,
+          avatar: conversation['other_participant_picture'] as String?,
           isOnline: false,
           conversationId: conversation['id'] as String,
-          relatedRequestId: conversation['related_request']?['id'] as String?,
+          relatedRequestId: conversation['blood_request']?['id'] as String?,
         ),
       ),
     );

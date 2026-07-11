@@ -2233,10 +2233,6 @@ def complete_pledge_donation(request, request_id, pledge_id):
         "blood_request_status": "partial"
     }
     """
-    # Variables to store data for notification after transaction
-    pledge_donor = None
-    notification_data = {}
-
     try:
         from django.db import transaction
         from django.utils import timezone
@@ -2359,6 +2355,38 @@ def complete_pledge_donation(request, request_id, pledge_id):
             if donation_data:
                 response_data['donation'] = donation_data
 
+            # Send notification AFTER the transaction commits
+            # This is outside the try-except to ensure notification failures don't break the transaction
+            try:
+                from notifications.views import send_push_notification
+                # Get patient name for the notification
+                patient_name = blood_request.requested_by.full_name if blood_request.requested_by else 'Patient'
+
+                # Build notification data with all relevant information
+                notif_data = {
+                    'request_id': str(blood_request.id),
+                    'pledge_id': str(pledge.id),
+                    'units_donated': units_donated,
+                    'patient_name': patient_name,
+                    'blood_group': blood_request.blood_group,
+                }
+
+                logger.info(f"Sending donation completion notification to donor {pledge.donor.email}")
+
+                # Use send_push_notification to send both in-app and push notification
+                notification = send_push_notification(
+                    user=pledge.donor,
+                    title='Donation Completed by Patient ✅',
+                    message=f'{patient_name} has confirmed your blood donation. Thank you for donating!',
+                    notif_type='donation_completed',
+                    data=notif_data,
+                    send_push=True
+                )
+                logger.info(f"✅ Push notification sent to donor {pledge.donor.email}: 'Donation Completed'")
+                logger.info(f"✅ Notification created: ID={notification.id if notification else 'N/A'}")
+            except Exception as e:
+                logger.error(f"❌ Failed to send push notification: {str(e)}", exc_info=True)
+
             return success_response(
                 message='Donation completed successfully! Thank you for helping save lives.',
                 data=response_data
@@ -2380,39 +2408,6 @@ def complete_pledge_donation(request, request_id, pledge_id):
             message='Failed to complete donation.',
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
-    # Send notification AFTER the atomic transaction completes
-    # This ensures notification failures don't break the transaction
-    if pledge_donor and notification_data:
-        try:
-            from notifications.views import send_push_notification
-            # Get patient name for the notification
-            patient_name = blood_request.requested_by.full_name if blood_request.requested_by else 'Patient'
-
-            # Build notification data with all relevant information
-            notif_data = {
-                'request_id': str(notification_data['blood_request_id']),
-                'pledge_id': str(notification_data['pledge_id']),
-                'units_donated': notification_data['units_donated'],
-                'patient_name': patient_name,
-                'blood_group': blood_request.blood_group,
-            }
-
-            logger.info(f"Sending donation completion notification to donor {pledge_donor.email}")
-
-            # Use send_push_notification to send both in-app and push notification
-            notification = send_push_notification(
-                user=pledge_donor,
-                title='Request Completed by Patient ✅',
-                message=f'{patient_name} has confirmed/completed your blood donation request. Thank you for donating!',
-                notif_type='donation_confirmed',
-                data=notif_data,
-                send_push=True
-            )
-            logger.info(f"✅ Push notification sent to donor {pledge_donor.email}: 'Request Completed by Patient'")
-            logger.info(f"✅ Notification created: ID={notification.id if notification else 'N/A'}")
-        except Exception as e:
-            logger.error(f"❌ Failed to send push notification: {str(e)}", exc_info=True)
 
 
 @api_view(['GET'])

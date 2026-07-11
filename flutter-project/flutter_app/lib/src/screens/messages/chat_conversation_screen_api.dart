@@ -35,6 +35,12 @@ class _ChatConversationScreenApiState extends State<ChatConversationScreenApi> {
   String? _errorMessage;
   String? _conversationId;
 
+  // Conversation details loaded from API
+  String? _participantName;
+  String? _participantAvatar;
+  String? _relatedRequestId;
+  String? _recipientId;
+
   @override
   void initState() {
     super.initState();
@@ -66,6 +72,21 @@ class _ChatConversationScreenApiState extends State<ChatConversationScreenApi> {
       if (result['success'] == true && result['data'] != null) {
         final data = result['data'] as Map<String, dynamic>;
         final messages = data['messages'] as List? ?? [];
+
+        // Extract conversation details if available
+        final conversation = data['conversation'] as Map<String, dynamic>?;
+        if (conversation != null) {
+          final otherParticipant = conversation['other_participant'] as Map<String, dynamic>?;
+          if (otherParticipant != null) {
+            _participantName = otherParticipant['full_name'] as String?;
+            _participantAvatar = otherParticipant['avatar_url'] as String?;
+          }
+          // Get related request info
+          final bloodRequest = conversation['blood_request'] as Map<String, dynamic>?;
+          if (bloodRequest != null) {
+            _relatedRequestId = bloodRequest['id'] as String?;
+          }
+        }
 
         setState(() {
           _messages = messages.map((m) => m as Map<String, dynamic>).toList();
@@ -202,6 +223,10 @@ class _ChatConversationScreenApiState extends State<ChatConversationScreenApi> {
   }
 
   Widget _buildHeader() {
+    // Use loaded participant name if available, otherwise fallback to widget.name
+    final displayName = _participantName ?? widget.name ?? 'User';
+    final displayAvatar = _participantAvatar ?? widget.avatar;
+
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -226,66 +251,37 @@ class _ChatConversationScreenApiState extends State<ChatConversationScreenApi> {
             const SizedBox(width: 12),
 
             // Avatar
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundImage: widget.avatar != null && widget.avatar!.isNotEmpty
-                      ? NetworkImage(widget.avatar!)
-                      : null,
-                  backgroundColor: AppColors.softPink,
-                  child: (widget.avatar == null || widget.avatar!.isEmpty)
-                      ? Text(
-                          widget.name!.isNotEmpty ? widget.name![0].toUpperCase() : '?',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        )
-                      : null,
-                ),
-                // Online Indicator
-                if (widget.isOnline)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: AppColors.online,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+            CircleAvatar(
+              radius: 24,
+              backgroundImage: displayAvatar != null && displayAvatar.isNotEmpty
+                  ? NetworkImage(displayAvatar)
+                  : null,
+              backgroundColor: AppColors.softPink,
+              child: (displayAvatar == null || displayAvatar.isEmpty)
+                  ? Text(
+                      displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                    ),
-                  ),
-              ],
+                    )
+                  : null,
             ),
 
             const SizedBox(width: 12),
 
-            // Name and Status
+            // Name only (no online/offline status)
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.name ?? 'User',
+                    displayName,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.isOnline ? 'Online' : 'Offline',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: widget.isOnline ? AppColors.online : Colors.grey,
                     ),
                   ),
                 ],
@@ -293,7 +289,7 @@ class _ChatConversationScreenApiState extends State<ChatConversationScreenApi> {
             ),
 
             // Related Request Badge
-            if (widget.relatedRequestId != null)
+            if (widget.relatedRequestId != null || _relatedRequestId != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -319,15 +315,6 @@ class _ChatConversationScreenApiState extends State<ChatConversationScreenApi> {
                   ],
                 ),
               ),
-
-            const SizedBox(width: 16),
-
-            // Call Icon
-            Icon(
-              Icons.call_rounded,
-              size: 22,
-              color: AppColors.primary,
-            ),
           ],
         ),
       ),

@@ -36,7 +36,8 @@ class ConversationSerializer(serializers.ModelSerializer):
     other_participant = serializers.SerializerMethodField()
     other_participant_picture = serializers.SerializerMethodField()
     other_participant_blood_group = serializers.SerializerMethodField()
-    last_message = serializers.SerializerMethodField()
+    last_message_content = serializers.SerializerMethodField()
+    last_message_at = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
     is_blocked = serializers.SerializerMethodField()
     blood_request = serializers.SerializerMethodField()
@@ -45,8 +46,9 @@ class ConversationSerializer(serializers.ModelSerializer):
         model = Conversation
         fields = [
             'id', 'other_participant', 'other_participant_picture',
-            'other_participant_blood_group', 'last_message', 'unread_count',
-            'is_blocked', 'is_active', 'blood_request', 'created_at', 'updated_at'
+            'other_participant_blood_group', 'last_message_content', 'last_message_at',
+            'unread_count', 'is_blocked', 'is_active', 'blood_request',
+            'created_at', 'updated_at'
         ]
 
     def get_other_participant(self, obj):
@@ -58,14 +60,14 @@ class ConversationSerializer(serializers.ModelSerializer):
         if request.user == obj.patient:
             return {
                 'id': str(obj.donor.id),
-                'name': obj.donor.full_name,
+                'full_name': obj.donor.full_name,
                 'email': obj.donor.email,
                 'role': obj.donor.role,
             }
         else:
             return {
                 'id': str(obj.patient.id),
-                'name': obj.patient.full_name,
+                'full_name': obj.patient.full_name,
                 'email': obj.patient.email,
                 'role': obj.patient.role,
             }
@@ -98,12 +100,19 @@ class ConversationSerializer(serializers.ModelSerializer):
 
         return profile.blood_group if profile else None
 
-    def get_last_message(self, obj):
-        """Get the most recent message in the conversation."""
+    def get_last_message_content(self, obj):
+        """Get the content of the most recent message."""
         last = obj.messages.filter(is_deleted=False).order_by('-created_at').first()
         if last:
-            return MessageSerializer(last, context=self.context).data
+            return last.content
         return None
+
+    def get_last_message_at(self, obj):
+        """Get the timestamp of the most recent message."""
+        if obj.last_message_at:
+            return obj.last_message_at.isoformat()
+        # Fallback to conversation created_at if no messages yet
+        return obj.created_at.isoformat()
 
     def get_unread_count(self, obj):
         """Get count of unread messages."""
