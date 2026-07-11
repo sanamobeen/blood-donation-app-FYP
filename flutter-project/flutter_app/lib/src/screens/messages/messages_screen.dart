@@ -176,46 +176,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   ),
                 ),
               ),
-            const SizedBox(width: 12),
-            // Filter Icon
-            GestureDetector(
-              onTap: () {
-                _showFilterDialog();
-              },
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.filter_list_rounded,
-                  color: AppColors.textPrimary,
-                  size: 22,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // New Message Icon
-            GestureDetector(
-              onTap: () {
-                _showNewMessageDialog();
-              },
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.edit_rounded,
-                  color: AppColors.textPrimary,
-                  size: 22,
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -364,65 +324,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
     );
   }
 
-  void _showFilterDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter Conversations'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildFilterOption('All', true),
-            _buildFilterOption('Unread only', false),
-            _buildFilterOption('From requests', false),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterOption(String label, bool isSelected) {
-    return ListTile(
-      title: Text(label),
-      trailing: isSelected
-          ? const Icon(Icons.check, color: AppColors.primary)
-          : null,
-      onTap: () {
-        Navigator.pop(context);
-        // Apply filter logic
-      },
-    );
-  }
-
-  void _showNewMessageDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('New Message'),
-        content: const Text('To start a new conversation, please first find a blood request and contact the requester.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushNamed(context, AppRoutes.nearbyRequests);
-            },
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-            child: const Text('Browse Requests'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _ConversationTile extends StatelessWidget {

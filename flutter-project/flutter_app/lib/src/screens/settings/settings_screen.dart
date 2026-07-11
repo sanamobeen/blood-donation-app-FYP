@@ -24,9 +24,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   int _selectedTabIndex = 3; // Profile tab is index 3 (0=Home, 1=Request, 2=Chat, 3=Profile)
 
-  // Toggle states
-  bool _donationRemindersEnabled = true;
-
   // User data
   Map<String, dynamic>? _userProfile;
   bool _isLoading = true;
@@ -168,24 +165,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           title: 'Medical info',
                           icon: Icons.description_outlined,
                           onTap: () => _navigateTo(AppRoutes.medicalInfo),
-                        ),
-                        _SettingsItem(
-                          title: 'Donation reminders',
-                          icon: Icons.event_outlined,
-                          trailing: Switch(
-                            value: _donationRemindersEnabled,
-                            activeColor: AppColors.primary,
-                            onChanged: (value) {
-                              setState(() {
-                                _donationRemindersEnabled = value;
-                              });
-                            },
-                          ),
-                          onTap: () {
-                            setState(() {
-                              _donationRemindersEnabled = !_donationRemindersEnabled;
-                            });
-                          },
                         ),
                       ],
                     ),

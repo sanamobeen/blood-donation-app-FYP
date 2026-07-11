@@ -29,7 +29,7 @@ class LegalTermsScreen extends StatelessWidget {
                 'Privacy Policy',
                 [
                   _buildParagraph(
-                    'At Blood Donation, we are committed to protecting your privacy and ensuring the security of your personal information.',
+                    'At Blood Donor, we are committed to protecting your privacy and ensuring the security of your personal information.',
                   ),
                   _buildParagraph(
                     'Information We Collect:',
@@ -64,7 +64,7 @@ class LegalTermsScreen extends StatelessWidget {
                 'Terms of Service',
                 [
                   _buildParagraph(
-                    'By using the Blood Donation app, you agree to these terms of service.',
+                    'By using the Blood Donor app, you agree to these terms of service.',
                   ),
                   _buildParagraph(
                     'User Responsibilities:',
@@ -87,7 +87,7 @@ class LegalTermsScreen extends StatelessWidget {
                     isSubheading: true,
                   ),
                   _buildParagraph(
-                    'Blood Donation acts as a connecting platform only. We are not responsible for the actual donation process or medical outcomes. Users should consult healthcare professionals for medical advice.',
+                    'Blood Donor acts as a connecting platform only. We are not responsible for the actual donation process or medical outcomes. Users should consult healthcare professionals for medical advice.',
                   ),
                 ],
               ),

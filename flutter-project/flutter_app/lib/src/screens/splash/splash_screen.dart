@@ -187,7 +187,7 @@ class _SplashScreenState extends State<SplashScreen>
 
                       // App Name
                       const Text(
-                        'Blood Donation',
+                        'Blood Donor',
                         style: TextStyle(
                           fontSize: 38,
                           fontWeight: FontWeight.bold,

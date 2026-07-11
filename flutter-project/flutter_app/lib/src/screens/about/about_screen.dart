@@ -34,7 +34,7 @@ class AboutScreen extends StatelessWidget {
               // Mission Section
               _buildSection(
                 'Our Mission',
-                'Blood Donation is dedicated to saving lives by connecting blood donors with those in need. We believe that every blood donation can make a difference and help save up to three lives.',
+                'Blood Donor is dedicated to saving lives by connecting blood donors with those in need. We believe that every blood donation can make a difference and help save up to three lives.',
                 Icons.volunteer_activism,
               ),
               const SizedBox(height: 24),
@@ -92,7 +92,7 @@ class AboutScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Blood Donation',
+            'Blood Donor',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -365,7 +365,7 @@ class AboutScreen extends StatelessWidget {
       child: Column(
         children: [
           const Text(
-            'Blood Donation',
+            'Blood Donor',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
