@@ -1,0 +1,47 @@
+# Environment variables
+.env
+.env.local
+
+# Database
+*.sqlite3
+db.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Django
+/static/
+/media/
+/logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firebase credentials
+firebase-service-account.json
+*.pem
+*.key
+
+# Railway
+railway_up/
