@@ -1,3 +1,38 @@
-# This file helps Railway detect Python at root level
-# Actual requirements are in django-backend/requirements.txt
--e django-backend/requirements.txt
+# Django REST Framework - Blood Donation Backend
+
+# Core Django
+Django==5.2.3
+djangorestframework==3.15.2
+django-cors-headers==4.6.0
+
+# Production server
+gunicorn==23.0.0
+
+# JWT Authentication
+djangorestframework-simplejwt==5.5.0
+
+# Database - MySQL
+mysqlclient==2.2.4
+
+# Phone verification
+twilio==9.0.0
+firebase-admin==6.5.0
+
+# Rate limiting
+django-ratelimit==4.1.0
+
+# Security
+django-filter==24.3
+
+# Development tools
+python-decouple==3.8
+
+# Environment variables
+python-dotenv==1.0.1
+
+# Django Channels for WebSocket support
+channels==4.0.0
+daphne==4.0.0
+
+# Geospatial libraries for GPS distance calculation
+geopy==2.4.0
