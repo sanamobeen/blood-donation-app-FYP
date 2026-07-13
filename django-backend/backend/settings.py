@@ -119,21 +119,33 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 #     }
 # }
 
-# MySQL Configuration (for production)
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'blood_donation_db',
-        'USER': 'root',
-        'PASSWORD': 'password',  # Add your MySQL password here
-        'HOST': 'localhost',
-        'PORT': '3306',
-        'OPTIONS': {
-            'charset': 'utf8mb4',
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
+# MySQL Configuration - support for DATABASE_URL (Railway) and individual env vars
+import dj_database_url
+
+# Try DATABASE_URL first (Railway provides this), fallback to individual env vars
+database_url = os.environ.get('DATABASE_URL')
+
+if database_url:
+    # Railway MySQL format: mysql://user:password@host:port/database
+    DATABASES = {
+        'default': dj_database_url.parse(database_url)
     }
-}
+else:
+    # Local development - use individual environment variables or defaults
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.environ.get('DB_NAME', 'blood_donation_db'),
+            'USER': os.environ.get('DB_USER', 'root'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', 'password'),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '3306'),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            },
+        }
+    }
 
 
 # Password validation

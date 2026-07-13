@@ -30,6 +30,7 @@ python-decouple==3.8
 
 # Environment variables
 python-dotenv==1.0.1
+dj-database-url==2.3.0
 
 # Django Channels for WebSocket support
 channels==4.0.0
