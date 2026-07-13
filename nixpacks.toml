@@ -1,0 +1,8 @@
+[phases.build]
+cmds = ["cd django-backend && pip install --upgrade pip && pip install -r requirements.txt"]
+
+[phases.start]
+cmds = ["cd django-backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT"]
+
+[variables]
+PORT = "8000"
