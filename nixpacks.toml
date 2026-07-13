@@ -1,11 +1,8 @@
-[phases.setup]
-nixPkgs = ["python311", "mysql80"]
-
 [phases.build]
 cmds = ["cd django-backend && pip install -r requirements.txt"]
 
-[phases.start]
-cmds = ["cd django-backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT"]
+[start]
+cmd = "cd django-backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --threads 2 --worker-class gthread --worker-timeout 120 --timeout 120"
 
 [variables]
 PYTHONPATH = "/app/django-backend"
