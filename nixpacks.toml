@@ -2,13 +2,13 @@
 nixPkgs = ["python311", "mysql80", "pkg-config", "gcc"]
 
 [phases.build]
-cmds = ["pip install -r requirements.txt"]
+cmds = ["python -m venv /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt"]
 
 [phases.pre-deploy]
-cmds = ["cd django-backend && python manage.py migrate --noinput"]
+cmds = [". /opt/venv/bin/activate && cd django-backend && python manage.py migrate --noinput"]
 
 [start]
-cmd = "cd django-backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --threads 2 --worker-class gthread --worker-timeout 120 --timeout 120"
+cmd = ". /opt/venv/bin/activate && cd django-backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --threads 2 --worker-class gthread --worker-timeout 120 --timeout 120"
 
 [variables]
 PYTHONPATH = "/app"
@@ -17,3 +17,5 @@ PORT = "8000"
 [env]
 MYSQLCLIENT_CFLAGS = "-I/usr/include/mysql"
 MYSQLCLIENT_LDFLAGS = "-L/usr/lib/x86_64-linux-gnu -lmysqlclient"
+VIRTUAL_ENV = "/opt/venv"
+PATH = "/opt/venv/bin:$PATH"
