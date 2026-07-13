@@ -37,3 +37,7 @@ daphne==4.0.0
 
 # Geospatial libraries for GPS distance calculation
 geopy==2.4.0
+
+# AI Chatbot dependencies
+pandas==2.2.2
+scikit-learn==1.5.1
