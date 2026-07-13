@@ -25,5 +25,5 @@ void main() async {
   } catch (e) {
   }
 
-  runApp(const LifeDropApp());
+  runApp(const BloodDonorApp());
 }

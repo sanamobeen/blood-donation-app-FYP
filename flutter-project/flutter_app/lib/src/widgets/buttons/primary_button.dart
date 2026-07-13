@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// A primary button following the LifeDrop design system.
+/// A primary button following the Blood Donor design system.
 ///
 /// Features:
 /// - Crimson background (#D62828)
