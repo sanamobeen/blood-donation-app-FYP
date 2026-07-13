@@ -14,14 +14,14 @@ import 'screens/requests/blood_request_detail_screen.dart';
 import 'screens/messages/chat_conversation_screen_api.dart';
 import 'services/notification_service.dart';
 
-class LifeDropApp extends StatefulWidget {
-  const LifeDropApp({super.key});
+class BloodDonorApp extends StatefulWidget {
+  const BloodDonorApp({super.key});
 
   @override
-  State<LifeDropApp> createState() => _LifeDropAppState();
+  State<BloodDonorApp> createState() => _BloodDonorAppState();
 }
 
-class _LifeDropAppState extends State<LifeDropApp> {
+class _BloodDonorAppState extends State<BloodDonorApp> {
   final AppLinks _appLinks = AppLinks();
   StreamSubscription<Uri>? _sub;
 
@@ -158,7 +158,7 @@ class _LifeDropAppState extends State<LifeDropApp> {
         ChangeNotifierProvider(create: (_) => AdminProvider()),
       ],
       child: MaterialApp(
-        title: 'LifeDrop',
+        title: 'Blood Donor',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.theme,
         navigatorKey: navigatorKey,

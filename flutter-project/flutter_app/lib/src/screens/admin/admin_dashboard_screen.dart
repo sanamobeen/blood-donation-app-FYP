@@ -277,7 +277,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'LifeDrop',
+                  'Blood Donor',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -341,7 +341,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'LifeDrop',
+                  'Blood Donor',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -507,7 +507,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                       ),
                       Text(
-                        'admin@lifedrop.com',
+                        'admin@blooddonor.com',
                         style: TextStyle(
                           fontSize: 12,
                           color: Color(0xFF757575),

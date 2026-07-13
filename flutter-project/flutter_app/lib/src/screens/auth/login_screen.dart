@@ -165,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Please visit lifedrop.com on your browser to access admin features.',
+              'Please visit blooddonor.com on your browser to access admin features.',
               style: TextStyle(fontSize: 13, color: Color(0xFF666666)),
             ),
             const SizedBox(height: 16),

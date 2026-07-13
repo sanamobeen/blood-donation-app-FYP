@@ -521,7 +521,7 @@ final List<FAQItem> faqItems = [
   // Account Category
   FAQItem(
     question: 'How do I register as a donor?',
-    answer: 'To register as a donor, download the LifeDrop app, click "Sign Up", select "Donor" as your role, and complete your profile with your blood type, location, and contact information.',
+    answer: 'To register as a donor, download the Blood Donor app, click "Sign Up", select "Donor" as your role, and complete your profile with your blood type, location, and contact information.',
     category: 'Account',
   ),
   FAQItem(
@@ -572,7 +572,7 @@ final List<FAQItem> faqItems = [
   // Technical Category
   FAQItem(
     question: 'I\'m not receiving notifications. What should I do?',
-    answer: 'Check your phone settings and ensure LifeDrop has permission to send notifications. Also, verify notification settings in the app under Settings > Preferences > Notifications.',
+    answer: 'Check your phone settings and ensure Blood Donor has permission to send notifications. Also, verify notification settings in the app under Settings > Preferences > Notifications.',
     category: 'Technical',
   ),
   FAQItem(
@@ -587,7 +587,7 @@ final List<FAQItem> faqItems = [
   ),
   FAQItem(
     question: 'How do I enable location services?',
-    answer: 'Go to your phone\'s settings, find LifeDrop, and enable location access. This allows us to show nearby donors and requests.',
+    answer: 'Go to your phone\'s settings, find Blood Donor, and enable location access. This allows us to show nearby donors and requests.',
     category: 'Technical',
   ),
 ];

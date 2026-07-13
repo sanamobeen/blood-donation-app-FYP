@@ -108,7 +108,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        'Admin features are available on web only.\nVisit lifedrop.com on your browser.',
+                        'Admin features are available on web only.\nVisit blooddonor.com on your browser.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 13,

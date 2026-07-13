@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// An avatar widget with an online status indicator following the LifeDrop design system.
+/// An avatar widget with an online status indicator following the Blood Donor design system.
 ///
 /// Features:
 /// - Circular avatar
