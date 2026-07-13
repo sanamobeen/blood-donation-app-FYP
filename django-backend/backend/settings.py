@@ -17,6 +17,10 @@ from decouple import config, config as env
 import dotenv
 import os
 
+# Use PyMySQL as MySQL client (pure Python - no compilation)
+import pymysql
+pymysql.install_as_MySQLdb()
+
 # Load environment variables from .env file
 dotenv.load_dotenv()
 

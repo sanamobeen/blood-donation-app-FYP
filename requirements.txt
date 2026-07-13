@@ -11,8 +11,9 @@ gunicorn==23.0.0
 # JWT Authentication
 djangorestframework-simplejwt==5.5.0
 
-# Database - MySQL
-mysqlclient==2.2.4
+# Database - MySQL (Pure Python - no compilation required)
+PyMySQL==1.1.0
+cryptography==42.0.5
 
 # Phone verification
 twilio==9.0.0
