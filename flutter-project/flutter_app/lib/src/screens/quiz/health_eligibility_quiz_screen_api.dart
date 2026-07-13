@@ -644,7 +644,7 @@ class _HealthEligibilityQuizScreenApiState extends State<HealthEligibilityQuizSc
 
           // App Name
           const Text(
-            'LifeDrop',
+            'Blood Donor',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,

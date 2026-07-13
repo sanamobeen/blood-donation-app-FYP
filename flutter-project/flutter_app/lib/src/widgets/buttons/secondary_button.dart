@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// A secondary button following the LifeDrop design system.
+/// A secondary button following the Blood Donor design system.
 ///
 /// Features:
 /// - Crimson outline border

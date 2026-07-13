@@ -7,7 +7,7 @@ enum UrgencyLevel {
   critical,
 }
 
-/// An urgency tag widget following the LifeDrop design system.
+/// An urgency tag widget following the Blood Donor design system.
 ///
 /// Features:
 /// - Normal: Pink background

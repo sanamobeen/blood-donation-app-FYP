@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// A blood type selection chip following the LifeDrop design system.
+/// A blood type selection chip following the Blood Donor design system.
 ///
 /// Features:
 /// - Circular pill shape
