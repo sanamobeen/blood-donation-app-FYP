@@ -1,4 +1,4 @@
-# LifeDrop - Blood Donation Platform
+# Blood Donor- Blood Donor Platform
 
 A comprehensive full-stack blood donation platform connecting donors with patients in real-time.
 

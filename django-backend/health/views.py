@@ -21,6 +21,23 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+    """
+    Health check endpoint for Railway monitoring.
+
+    GET /api/health/
+
+    Response:
+    {
+        "status": "healthy"
+    }
+    """
+    from django.http import JsonResponse
+    return JsonResponse({"status": "healthy"})
+
+
 # Helper functions to create default quiz questions
 def create_default_questions():
     """Create default health eligibility quiz questions."""
