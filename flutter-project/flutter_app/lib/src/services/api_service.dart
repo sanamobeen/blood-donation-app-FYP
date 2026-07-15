@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import '../models/profile.dart';
@@ -27,6 +29,43 @@ class ApiService {
   static Future<String?> getCurrentUserId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_userIdKey);
+  }
+
+  // Helper function to detect image content type
+  static String _getImageContentType(String imagePath) {
+    final extension = imagePath.toLowerCase().split('.').last;
+    switch (extension) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'bmp':
+        return 'image/bmp';
+      default:
+        return 'image/jpeg'; // Fallback
+    }
+  }
+
+  // Helper function to create MultipartFile with proper content type
+  static Future<http.MultipartFile> _createImageMultipartFile(
+    String fieldName,
+    String imagePath,
+  ) async {
+    final file = File(imagePath);
+    final fileBytes = await file.readAsBytes();
+    final contentType = _getImageContentType(imagePath);
+
+    return http.MultipartFile.fromBytes(
+      fieldName,
+      fileBytes,
+      filename: imagePath.split('/').last,
+      contentType: http_parser.MediaType.parse(contentType),
+    );
   }
 
   // Save tokens
@@ -384,7 +423,7 @@ class ApiService {
 
       // Add profile picture if provided
       if (profilePicturePath != null) {
-        request.files.add(await http.MultipartFile.fromPath(
+        request.files.add(await _createImageMultipartFile(
           'profile_picture',
           profilePicturePath,
         ));
@@ -494,7 +533,7 @@ class ApiService {
 
       // Add profile picture if provided
       if (profilePicturePath != null) {
-        request.files.add(await http.MultipartFile.fromPath(
+        request.files.add(await _createImageMultipartFile(
           'profile_picture',
           profilePicturePath,
         ));
@@ -3110,8 +3149,8 @@ class ApiService {
 
       request.headers['Authorization'] = 'Bearer $token';
 
-      // Add profile picture file
-      request.files.add(await http.MultipartFile.fromPath(
+      // Add profile picture file with proper content type
+      request.files.add(await _createImageMultipartFile(
         'profile_picture',
         imagePath,
       ));
