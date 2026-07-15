@@ -1653,10 +1653,10 @@ def upload_profile_picture(request):
             )
 
         # Validate file type
-        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp']
         if image_file.content_type not in allowed_types:
             return error_response(
-                message='Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.',
+                message='Invalid file type. Please upload a JPEG, PNG, GIF, WebP, or BMP image.',
                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
             )
 
