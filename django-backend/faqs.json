@@ -1,0 +1,162 @@
+[
+  {
+    "question": "Who can donate blood?",
+    "answer": "Generally, you can donate blood if you are between 18-65 years old, weigh at least 45kg, and are in good health. You should not have donated blood in the last 90 days.",
+    "category": "Eligibility",
+    "keywords": "donate, eligibility, age, weight, requirements",
+    "priority": 10,
+    "target_role": "both"
+  },
+  {
+    "question": "Is blood donation safe?",
+    "answer": "Yes, blood donation is very safe. All equipment used is sterile and disposable. You cannot get any disease from donating blood. The process is supervised by trained medical professionals.",
+    "category": "Safety",
+    "keywords": "safe, risk, disease, infection",
+    "priority": 10,
+    "target_role": "both"
+  },
+  {
+    "question": "How often can I donate blood?",
+    "answer": "Men can donate blood every 3 months (90 days) and women can donate every 4 months (120 days). This waiting period allows your body to restore the donated blood.",
+    "category": "Process",
+    "keywords": "frequency, often, interval, wait",
+    "priority": 9,
+    "target_role": "both"
+  },
+  {
+    "question": "What should I do before donating blood?",
+    "answer": "Eat a healthy meal with iron-rich foods, drink plenty of water, and get a good night's sleep before donating. Avoid alcohol or fatty foods for 24 hours before donation.",
+    "category": "Preparation",
+    "keywords": "before, prepare, eat, drink",
+    "priority": 8,
+    "target_role": "both"
+  },
+  {
+    "question": "How long does the donation process take?",
+    "answer": "The entire blood donation process takes about 30-45 minutes. The actual donation takes only 10-15 minutes, while screening and recovery take the rest of the time.",
+    "category": "Process",
+    "keywords": "time, duration, long, minutes",
+    "priority": 8,
+    "target_role": "both"
+  },
+  {
+    "question": "What are the different blood groups?",
+    "answer": "There are 8 main blood groups: A+, A-, B+, B-, AB+, AB-, O+, and O-. O- is the universal donor and can give blood to anyone. AB+ is the universal recipient and can receive blood from anyone.",
+    "category": "Information",
+    "keywords": "blood groups, types, A, B, AB, O, positive, negative",
+    "priority": 9,
+    "target_role": "both"
+  },
+  {
+    "question": "What happens after donating blood?",
+    "answer": "After donating, you'll rest for 10-15 minutes and have refreshments. You should avoid heavy lifting or vigorous exercise for 24 hours. Drink plenty of fluids and eat well to help your body recover.",
+    "category": "Recovery",
+    "keywords": "after, post-donation, recover, side effects",
+    "priority": 7,
+    "target_role": "both"
+  },
+  {
+    "question": "Can I donate if I have a tattoo or piercing?",
+    "answer": "If you got a tattoo or piercing in the last 6 months, you cannot donate blood. After 6 months, if it was done at a licensed facility, you may be eligible to donate.",
+    "category": "Eligibility",
+    "keywords": "tattoo, piercing, restriction",
+    "priority": 7,
+    "target_role": "both"
+  },
+  {
+    "question": "How do I request blood for a patient?",
+    "answer": "You can request blood through our app by creating a blood request. Provide the patient's details, blood group needed, location, and urgency level. Nearby donors will be notified.",
+    "category": "Requests",
+    "keywords": "request blood, patient, need",
+    "priority": 9,
+    "target_role": "patient"
+  },
+  {
+    "question": "How do I become a blood donor?",
+    "answer": "Download our app, register as a donor, complete your profile with blood group and location, and mark yourself as available. You'll receive notifications when someone needs your blood type nearby.",
+    "category": "Onboarding",
+    "keywords": "register, signup, donor profile, available",
+    "priority": 9,
+    "target_role": "donor"
+  },
+  {
+    "question": "What medical conditions prevent donation?",
+    "answer": "Conditions that may prevent donation include: HIV/AIDS, hepatitis B or C, cancer, heart disease, recent pregnancy, recent major surgery, or taking certain medications. Each case is evaluated individually.",
+    "category": "Eligibility",
+    "keywords": "medical conditions, diseases, excluded",
+    "priority": 7,
+    "target_role": "both"
+  },
+  {
+    "question": "Why should I donate blood?",
+    "answer": "One blood donation can save up to 3 lives. Blood is needed for surgeries, cancer treatment, chronic illnesses, and trauma. There's no substitute for human blood - donors like you make lifesaving treatments possible.",
+    "category": "Motivation",
+    "keywords": "why, benefits, save lives, importance",
+    "priority": 8,
+    "target_role": "both"
+  },
+  {
+    "question": "Does donating blood hurt?",
+    "answer": "You may feel a slight pinch when the needle is inserted, similar to a mild bee sting. The discomfort lasts only a few seconds. Most people feel fine during and after donation.",
+    "category": "Concerns",
+    "keywords": "pain, hurt, discomfort, needle",
+    "priority": 7,
+    "target_role": "both"
+  },
+  {
+    "question": "Can I donate if I'm on medication?",
+    "answer": "Some medications may temporarily or permanently prevent you from donating. Common examples include antibiotics, blood thinners, and acne medications. Please consult with our screening staff about your specific medications.",
+    "category": "Eligibility",
+    "keywords": "medication, drugs, medicine",
+    "priority": 7,
+    "target_role": "both"
+  },
+  {
+    "question": "What is blood donation?",
+    "answer": "Blood donation is a voluntary process where a person gives blood, typically about 450ml (one unit), which is used to help patients who need blood transfusions due to surgery, injury, or illness.",
+    "category": "Information",
+    "keywords": "what, definition, meaning",
+    "priority": 10,
+    "target_role": "both"
+  },
+  {
+    "question": "Hello",
+    "answer": "Hello! Welcome to Blood Donor. I'm here to help with any blood donation questions you may have. How can I assist you today?",
+    "category": "Greetings",
+    "keywords": "hi, hello, greetings",
+    "priority": 5,
+    "target_role": "both"
+  },
+  {
+    "question": "Thank you",
+    "answer": "You're welcome! If you have any more questions about blood donation, feel free to ask. Together, we can save lives!",
+    "category": "Greetings",
+    "keywords": "thanks, thank you",
+    "priority": 5,
+    "target_role": "both"
+  },
+  {
+    "question": "Bye",
+    "answer": "Goodbye, and thank you for your interest in blood donation! Every donation makes a difference. Stay healthy!",
+    "category": "Greetings",
+    "keywords": "bye, goodbye, farewell",
+    "priority": 5,
+    "target_role": "both"
+  },
+  {
+    "question": "What documents do I need to donate?",
+    "answer": "You'll need a valid government-issued ID with photo and proof of age (must be 18-65 years old). First-time donors may need to complete a health questionnaire.",
+    "category": "Requirements",
+    "keywords": "documents, ID, proof, requirements",
+    "priority": 7,
+    "target_role": "both"
+  },
+  {
+    "question": "Can I donate after COVID-19 vaccination?",
+    "answer": "Yes, you can donate blood after receiving a COVID-19 vaccine. There's no waiting period required after vaccination, as long as you're feeling well and have no symptoms.",
+    "category": "Eligibility",
+    "keywords": "COVID, vaccine, vaccination",
+    "priority": 6,
+    "target_role": "both"
+  }
+]
